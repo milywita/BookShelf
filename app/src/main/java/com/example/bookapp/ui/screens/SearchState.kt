@@ -5,5 +5,8 @@ import com.example.bookapp.domain.model.Book
 
 data class SearchState(
     val searchQuery: String = "",
-    val books: List<Book> = emptyList()
+    val books: List<Book> = emptyList(),
+
+    // property to track selected book
+    val selectedBook: Book? = null
 )

@@ -5,24 +5,28 @@ import com.squareup.moshi.JsonClass
 
 @JsonClass(generateAdapter = true)
 data class BookResponse(
-    @Json(name = "items") val items: List<BookItem> = emptyList()
+    @Json(name = "items") val items: List<BookItem>? = null
 )
 
 @JsonClass(generateAdapter = true)
 data class BookItem(
-    @Json(name = "id") val id: String,
-    @Json(name = "volumeInfo") val volumeInfo: VolumeInfo
+    @Json(name = "id") val id: String? = null,
+    @Json(name = "volumeInfo") val volumeInfo: VolumeInfo? = null
 )
 
 @JsonClass(generateAdapter = true)
 data class VolumeInfo(
-    @Json(name = "title") val title: String = "",
-    @Json(name = "authors") val authors: List<String> = emptyList(),
-    @Json(name = "description") val description: String = "",
-    @Json(name = "imageLinks") val imageLinks: ImageLinks? = null
+    @Json(name = "title") val title: String? = null,
+    @Json(name = "authors") val authors: List<String>? = null,
+    @Json(name = "description") val description: String? = null,
+    @Json(name = "imageLinks") val imageLinks: ImageLinks? = null,
+    // ADDED: New fields
+    @Json(name = "publishedDate") val publishedDate: String? = null,
+    @Json(name = "pageCount") val pageCount: Int? = null,
+    @Json(name = "categories") val categories: List<String>? = null
 )
 
 @JsonClass(generateAdapter = true)
 data class ImageLinks(
-    @Json(name = "thumbnail") val thumbnail: String = ""
+    @Json(name = "thumbnail") val thumbnail: String? = null
 )

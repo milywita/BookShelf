@@ -1,0 +1,700 @@
+api.BookService.kt
+package com.example.bookapp.data.api
+
+import com.example.bookapp.data.model.BookResponse
+import retrofit2.http.GET
+import retrofit2.http.Query
+
+// Retrofit API interface
+interface BookService {
+    @GET("volumes")
+    suspend fun searchBooks(
+        @Query("q") query: String,
+        @Query("maxResults") maxResult: Int = 40
+    ): BookResponse
+
+
+}
+
+di.NetworkModule.kt
+package com.example.bookapp.data.di
+
+import com.example.bookapp.data.api.BookService
+import com.squareup.moshi.Moshi
+import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
+import retrofit2.Retrofit
+import retrofit2.converter.moshi.MoshiConverterFactory
+
+//Sets up API client
+object NetworkModule{
+
+    private const val BASE_URL = "https://www.googleapis.com/books/v1/"
+    // Creating Moshi instance with Kotlin adapter
+    private val moshi = Moshi.Builder()
+        .add(KotlinJsonAdapterFactory())
+        .build()
+
+    // Creating Retrofit instance
+    private val retrofit = Retrofit.Builder()
+        .baseUrl(BASE_URL)
+        .addConverterFactory(MoshiConverterFactory.create(moshi))
+        .build()
+
+    // Creating API service instance
+    val bookService: BookService = retrofit.create(BookService::class.java)
+
+
+
+
+}
+
+local.dao.BookDao.kt
+package com.example.bookapp.data.local.dao
+
+import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
+import com.example.bookapp.data.local.entity.BookEntity
+import kotlinx.coroutines.flow.Flow
+
+// Data Access Object(DAO) -Defines database operations
+@Dao
+interface BookDao {
+  @Query("SELECT * FROM books") fun getAllBooks(): Flow<List<BookEntity>>
+
+  @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insertBook(book: BookEntity)
+}
+
+local.entity.BookEntity.kt
+package com.example.bookapp.data.local.entity
+
+import androidx.room.Entity
+import androidx.room.PrimaryKey
+import com.example.bookapp.domain.model.Book
+
+// Entity - structure our data in database
+@Entity(tableName = "books")
+data class BookEntity(
+    @PrimaryKey val id: String,
+    val title: String,
+    val author: String,
+    val description: String,
+    val thumbnailUrl: String,
+    val publishedDate: String,
+    val pageCount: Int,
+    val categories: String
+)
+
+// Conversion functions
+fun Book.toBookEntity() =
+    BookEntity(
+        id = id,
+        title = title,
+        author = author,
+        description = description,
+        thumbnailUrl = thumbnailUrl,
+        publishedDate = publishedDate,
+        pageCount = pageCount,
+        categories = categories.joinToString(","))
+
+fun BookEntity.toBook() =
+    Book(
+        id = id,
+        title = title,
+        author = author,
+        description = description,
+        thumbnailUrl = thumbnailUrl,
+        publishedDate = publishedDate,
+        pageCount = pageCount,
+        categories = categories.split(",").filter { it.isNotEmpty() })
+
+local.BookDatabase
+package com.example.bookapp.data.local
+
+import android.content.Context
+import androidx.room.Database
+import androidx.room.Room
+import androidx.room.RoomDatabase
+import com.example.bookapp.data.local.dao.BookDao
+import com.example.bookapp.data.local.entity.BookEntity
+
+// Main database class
+@Database(entities = [BookEntity::class], version = 1, exportSchema = true)
+abstract class BookDatabase : RoomDatabase() {
+  abstract fun bookDao(): BookDao
+
+  companion object {
+    @Volatile private var INSTANCE: BookDatabase? = null
+
+    fun getDatabase(context: Context): BookDatabase {
+      return INSTANCE
+          ?: synchronized(this) {
+            val instance =
+                Room.databaseBuilder(
+                        context.applicationContext, BookDatabase::class.java, "book_database")
+                    .build()
+            INSTANCE = instance
+            instance
+          }
+    }
+  }
+}
+
+model.BookResponse.kt
+package com.example.bookapp.data.model
+import com.squareup.moshi.Json
+import com.squareup.moshi.JsonClass
+
+@JsonClass(generateAdapter = true)
+data class BookResponse(
+    @Json(name = "items") val items: List<BookItem>? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class BookItem(
+    @Json(name = "id") val id: String? = null,
+    @Json(name = "volumeInfo") val volumeInfo: VolumeInfo? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class VolumeInfo(
+    @Json(name = "title") val title: String? = null,
+    @Json(name = "authors") val authors: List<String>? = null,
+    @Json(name = "description") val description: String? = null,
+    @Json(name = "imageLinks") val imageLinks: ImageLinks? = null,
+    // ADDED: New fields
+    @Json(name = "publishedDate") val publishedDate: String? = null,
+    @Json(name = "pageCount") val pageCount: Int? = null,
+    @Json(name = "categories") val categories: List<String>? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class ImageLinks(
+    @Json(name = "thumbnail") val thumbnail: String? = null
+)
+
+repository.BookRepository
+package com.example.bookapp.data.repository
+
+import com.example.bookapp.data.api.BookService
+import com.example.bookapp.data.local.dao.BookDao
+import com.example.bookapp.data.local.entity.toBook
+import com.example.bookapp.data.local.entity.toBookEntity
+import com.example.bookapp.domain.model.Book
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+
+// Connects database and network operations
+
+class BookRepository(private val bookService: BookService, private val bookDao: BookDao) {
+  // Network operation - Get books from API
+  suspend fun searchBooks(query: String): List<Book> {
+    return try {
+      val response = bookService.searchBooks(query)
+      response.items?.map { bookItem ->
+        val volumeInfo = bookItem.volumeInfo
+        Book(
+            id = bookItem.id ?: "",
+            title = volumeInfo?.title ?: "Unknown Title",
+            author = volumeInfo?.authors?.firstOrNull() ?: "Unknown Author",
+            description = volumeInfo?.description ?: "No description available",
+            thumbnailUrl = volumeInfo?.imageLinks?.thumbnail ?: "",
+            publishedDate = volumeInfo?.publishedDate ?: "Unknown date",
+            pageCount = volumeInfo?.pageCount ?: 0,
+            categories = volumeInfo?.categories ?: emptyList())
+      } ?: emptyList()
+    } catch (e: Exception) {
+      emptyList()
+    }
+  }
+
+  // Database operations
+  fun getSavedBooks(): Flow<List<Book>> {
+    return bookDao.getAllBooks().map { entities -> entities.map { it.toBook() } }
+  }
+
+  suspend fun saveBook(book: Book) {
+    bookDao.insertBook(book.toBookEntity())
+  }
+}
+
+domain.model.Book
+package com.example.bookapp.domain.model
+// Initial book model
+data class Book(
+    val id: String = "",
+    val title: String,
+    val author: String,
+    val description: String = "",
+    val thumbnailUrl: String = "",
+    val publishedDate: String = "",
+    val pageCount: Int = 0,
+    val categories: List<String> = emptyList()
+)
+
+ui.screens.BookDetailScreen.kt
+package com.example.bookapp.ui.screens
+
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.*
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import com.example.bookapp.domain.model.Book
+
+// Book detail screen
+@Composable
+fun BookDetailScreen(
+    book: Book,
+    onBackClick: () -> Unit,
+    onSaveClick: (Book) -> Unit = {} // Add this parameter
+) {
+  Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
+    // Buttons row
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+        horizontalArrangement = Arrangement.SpaceBetween) {
+          Button(onClick = onBackClick) { Text("Back to Search") }
+
+          Button(onClick = { onSaveClick(book) }) { Text("Save Book") }
+        }
+
+    // temporary Text to verify ID
+    Text(
+        text = "Book ID: ${book.id}",
+        style = MaterialTheme.typography.bodySmall,
+        modifier = Modifier.padding(bottom = 8.dp))
+
+    // Book details
+    Text(
+        text = book.title,
+        style = MaterialTheme.typography.headlineMedium,
+        modifier = Modifier.padding(bottom = 8.dp))
+
+    Text(
+        text = "By ${book.author}",
+        style = MaterialTheme.typography.titleMedium,
+        modifier = Modifier.padding(bottom = 16.dp))
+
+    if (book.publishedDate.isNotBlank()) {
+      Text(
+          text = "Published: ${book.publishedDate}",
+          style = MaterialTheme.typography.bodyMedium,
+          modifier = Modifier.padding(bottom = 8.dp))
+    }
+
+    if (book.pageCount > 0) {
+      Text(
+          text = "Pages: ${book.pageCount}",
+          style = MaterialTheme.typography.bodyMedium,
+          modifier = Modifier.padding(bottom = 8.dp))
+    }
+
+    if (book.categories.isNotEmpty()) {
+      Text(
+          text = "Categories:",
+          style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+          modifier = Modifier.padding(bottom = 4.dp))
+      book.categories.forEach { category ->
+        Text(
+            text = "• $category",
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(start = 8.dp, bottom = 2.dp))
+      }
+    }
+
+    Spacer(modifier = Modifier.height(16.dp))
+
+    if (book.description.isNotBlank()) {
+      Text(
+          text = "Description:",
+          style = MaterialTheme.typography.titleMedium,
+          modifier = Modifier.padding(bottom = 8.dp))
+      Text(text = book.description, style = MaterialTheme.typography.bodyMedium)
+    }
+  }
+}
+
+
+ui.screens.BookSearchScreen.kt
+package com.example.bookapp.ui.screens
+
+import android.app.Application
+import android.widget.Toast
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.bookapp.domain.model.Book
+
+// Main search screen with saved books toggle
+
+@Composable
+fun BookSearchScreen() {
+  val context = LocalContext.current
+  val viewModel: BookSearchViewModel =
+      viewModel(
+          factory =
+              object : ViewModelProvider.Factory {
+                override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                  if (modelClass.isAssignableFrom(BookSearchViewModel::class.java)) {
+                    return BookSearchViewModel(context.applicationContext as Application) as T
+                  }
+                  throw IllegalArgumentException("Unknown ViewModel class")
+                }
+              })
+
+  val state by viewModel.state.collectAsState()
+  val savedBooks by viewModel.savedBooks.collectAsState()
+
+  // Show toast when message changes
+  LaunchedEffect(state.message) {
+    state.message?.let { message ->
+      Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+      viewModel.clearMessage()
+    }
+  }
+
+  // Handle book detail navigation
+  state.selectedBook?.let { book ->
+    BookDetailScreen(
+        book = book, onBackClick = viewModel::onBackClick, onSaveClick = viewModel::saveBook)
+    return
+  }
+
+  Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+    // Toggle between search and saved books
+    Button(
+        onClick = viewModel::toggleSavedBooks,
+        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+          Text(if (state.isShowingSavedBooks) "Show Search" else "Show Saved Books")
+        }
+
+    if (state.isShowingSavedBooks) {
+      // Saved books list
+      LazyColumn(modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) {
+        items(savedBooks) { book ->
+          BookItem(book = book, onClick = { viewModel.onBookClick(book) })
+        }
+      }
+    } else {
+      // Show search interface and results
+      TextField(
+          value = state.searchQuery,
+          onValueChange = viewModel::onSearchQueryChange,
+          label = { Text("Search for books") },
+          placeholder = { Text("Enter book title") },
+          modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp))
+
+      Button(onClick = viewModel::onSearchClick, modifier = Modifier.fillMaxWidth()) {
+        Text("Search")
+      }
+
+      LazyColumn(modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) {
+        items(state.books) { book ->
+          BookItem(book = book, onClick = { viewModel.onBookClick(book) })
+        }
+      }
+    }
+  }
+}
+
+@Composable
+fun BookItem(book: Book, onClick: () -> Unit) {
+  Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).clickable(onClick = onClick)) {
+    Column(modifier = Modifier.padding(16.dp)) {
+      Text(text = book.title, style = MaterialTheme.typography.titleMedium)
+      Text(text = "By ${book.author}", style = MaterialTheme.typography.bodyMedium)
+    }
+  }
+}
+
+
+ui.screens.BookSearchViewModel
+// ui/screens/BookSearchViewModel.kt
+package com.example.bookapp.ui.screens
+
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel  // Change this import
+import androidx.lifecycle.viewModelScope
+import com.example.bookapp.data.di.NetworkModule
+import com.example.bookapp.data.local.BookDatabase
+import com.example.bookapp.data.repository.BookRepository
+import com.example.bookapp.domain.model.Book
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+
+class BookSearchViewModel(application: Application) : AndroidViewModel(application) {  // Change this line
+    private val database = BookDatabase.getDatabase(getApplication())
+    private val repository = BookRepository(
+        bookService = NetworkModule.bookService,
+        bookDao = database.bookDao()
+    )
+
+    private val _state = MutableStateFlow(SearchState())
+    val state: StateFlow<SearchState> = _state.asStateFlow()
+
+    fun onSearchQueryChange(query: String) {
+        _state.value = _state.value.copy(searchQuery = query)
+    }
+
+    fun onSearchClick() {
+        val currentQuery = state.value.searchQuery
+        if (currentQuery.isBlank()) return
+
+        viewModelScope.launch {
+            try {
+                val books = repository.searchBooks(currentQuery)
+                _state.value = _state.value.copy(books = books)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    fun onBookClick(book: Book) {
+        _state.value = _state.value.copy(selectedBook = book)
+    }
+
+    fun onBackClick() {
+        _state.value = _state.value.copy(selectedBook = null)
+    }
+
+    // Add new function to save book
+    fun clearMessage() {
+        _state.value = _state.value.copy(message = null)
+    }
+
+    fun saveBook(book: Book) {
+        viewModelScope.launch {
+            try {
+                repository.saveBook(book)
+                _state.value = _state.value.copy(message = "Book saved successfully!")
+            } catch (e: Exception) {
+                _state.value = _state.value.copy(message = "Error saving book: ${e.message}")
+                e.printStackTrace()
+            }
+        }
+    }
+    val savedBooks: StateFlow<List<Book>> = repository.getSavedBooks()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    // Add this function
+    fun toggleSavedBooks() {
+        _state.value = _state.value.copy(
+            isShowingSavedBooks = !state.value.isShowingSavedBooks
+        )
+    }
+}
+
+
+ui.screens.SearchState
+package com.example.bookapp.ui.screens
+
+import android.app.DownloadManager.Query
+import com.example.bookapp.domain.model.Book
+
+data class SearchState(
+    val searchQuery: String = "",
+    val books: List<Book> = emptyList(),
+    val selectedBook: Book? = null,
+    val message: String? = null,
+    val isShowingSavedBooks: Boolean = false
+
+)
+
+build.gradle.kts
+// App-specific  build configuration
+
+plugins {
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.ksp)
+}
+
+android {
+    namespace = "com.example.bookapp"
+    compileSdk = 35
+
+    defaultConfig {
+        applicationId = "com.example.bookapp"
+        minSdk = 24
+        targetSdk = 34
+        versionCode = 1
+        versionName = "1.0"
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+    }
+    kotlinOptions {
+        jvmTarget = "11"
+    }
+    buildFeatures {
+        compose = true
+    }
+    composeOptions {
+        kotlinCompilerExtensionVersion = "1.5.8"
+    }
+    ksp {
+        arg("room.schemaLocation", "$projectDir/schemas")
+    }
+}
+
+dependencies {
+    // Existing dependencies
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.activity.compose)
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.ui)
+    implementation(libs.androidx.ui.graphics)
+    implementation(libs.androidx.ui.tooling.preview)
+    implementation(libs.androidx.material3)
+
+    // Add these new dependencies
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.runtime.compose)
+
+    // Testing dependencies
+    testImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.espresso.core)
+    androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation(libs.androidx.ui.test.junit4)
+    debugImplementation(libs.androidx.ui.tooling)
+    debugImplementation(libs.androidx.ui.test.manifest)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.runtime.compose)
+
+    // Retrofit
+    implementation(libs.retrofit.core)
+    implementation(libs.retrofit.moshi)
+    implementation(libs.moshi.kotlin)
+
+
+    // Room
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
+}
+
+libs.versions.toml
+[versions]
+agp = "8.7.2"  # Current stable version
+kotlin = "1.9.22"  # Current stable version
+coreKtx = "1.12.0"  # Current stable version
+junit = "4.13.2"
+junitVersion = "1.1.5"
+espressoCore = "3.5.1"
+lifecycleRuntimeKtx = "2.7.0"  # Current stable version
+activityCompose = "1.8.2"  # Current stable version
+composeBom = "2024.02.00"  # Current stable version
+lifecycle = "2.7.0"  # Added for ViewModel
+composeCompiler = "1.5.8"
+retrofit = "2.9.0"
+moshi = "1.14.0"
+moshiKotlin = "1.14.0"
+room = "2.6.1"
+ksp = "1.9.22-1.0.17"
+
+[libraries]
+androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
+junit = { group = "junit", name = "junit", version.ref = "junit" }
+androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
+androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
+androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
+androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
+androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
+androidx-ui = { group = "androidx.compose.ui", name = "ui" }
+androidx-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }
+androidx-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
+androidx-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
+androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
+androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
+androidx-material3 = { group = "androidx.compose.material3", name = "material3" }
+
+# new libraries
+androidx-lifecycle-viewmodel-compose = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "lifecycle" }
+androidx-lifecycle-runtime-compose = { group = "androidx.lifecycle", name = "lifecycle-runtime-compose", version.ref = "lifecycle" }
+
+# Retrofit
+retrofit-core = { group = "com.squareup.retrofit2", name = "retrofit", version.ref = "retrofit" }
+retrofit-moshi = { group = "com.squareup.retrofit2", name = "converter-moshi", version.ref = "retrofit" }
+moshi-kotlin = { group = "com.squareup.moshi", name = "moshi-kotlin", version.ref = "moshiKotlin" }
+
+# Room
+androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
+androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
+androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+
+settings.gradle.kts
+pluginManagement {
+  repositories {
+    google {
+      content {
+        includeGroupByRegex("com\\.android.*")
+        includeGroupByRegex("com\\.google.*")
+        includeGroupByRegex("androidx.*")
+      }
+    }
+    mavenCentral()
+    gradlePluginPortal()
+    resolutionStrategy {
+      eachPlugin {
+        if (requested.id.id == "com.google.devtools.ksp") {
+          useModule("com.google.devtools.ksp:com.google.devtools.ksp.gradle.plugin:1.9.22-1.0.17")
+        }
+      }
+    }
+  }
+  dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+      google()
+      mavenCentral()
+    }
+  }
+
+  rootProject.name = "BookApp"
+  include(":app")
+}

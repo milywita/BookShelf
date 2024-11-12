@@ -1,11 +1,1 @@
 /build
-*.iml
-.gradle/
-/local.properties
-/.idea/
-/app/build/
-/build/
-.DS_Store
-/captures
-.externalNativeBuild
-.cxx

@@ -4,6 +4,8 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.room)
 }
 
 android {
@@ -18,6 +20,7 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
     }
 
     buildTypes {
@@ -42,11 +45,10 @@ android {
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.8"
     }
-    ksp {
-        arg("room.schemaLocation", "$projectDir/schemas")
-    }
 }
-
+room {
+    schemaDirectory("$projectDir/schemas")
+}
 dependencies {
     // Existing dependencies
     implementation(libs.androidx.core.ktx)

@@ -1,15 +1,38 @@
+# Android Studio / IntelliJ IDEA
+.idea/
 *.iml
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/gradle.xml
+.idea/assetWizardSettings.xml
+.idea/dictionaries
+.idea/libraries
+.idea/caches
+.idea/modules.xml
+.idea/navEditor.xml
+.idea/appInsightsSettings.xml
+.idea/codeStyles/
 .gradle
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-.DS_Store
+
+# Android build folders
 /build
+/app/build
 /captures
 .externalNativeBuild
 .cxx
+
+# Local configuration file
 local.properties
+
+# MacOS files
+.DS_Store
+
+# Windows files
+Thumbs.db
+
+# Keystore files
+*.jks
+*.keystore
+
+# Log Files
+*.log

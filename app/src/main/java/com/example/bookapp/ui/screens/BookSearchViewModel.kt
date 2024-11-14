@@ -2,7 +2,7 @@
 package com.example.bookapp.ui.screens
 
 import android.app.Application
-import androidx.lifecycle.AndroidViewModel  // Change this import
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.bookapp.data.di.NetworkModule
 import com.example.bookapp.data.local.BookDatabase

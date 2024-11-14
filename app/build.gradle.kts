@@ -56,6 +56,10 @@ android {
                 isReturnDefaultValues = true
             }
         }
+
+        tasks.withType<Test> {
+            jvmArgs("-XX:+EnableDynamicAgentLoading")
+        }
     }
 }
 room {
@@ -98,5 +102,10 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
 
+    //test
+    testImplementation(libs.junit)
+    testImplementation(libs.mockito.core)
+    testImplementation(libs.mockito.kotlin)
+    testImplementation(libs.kotlinx.coroutines.test)
 }
 

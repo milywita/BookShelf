@@ -86,6 +86,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.junit.ktx)
     implementation(libs.androidx.ui.test.junit4.android)
+    implementation(libs.androidx.navigation.compose)
 
     // Testing dependencies
     testImplementation(libs.junit)
@@ -114,7 +115,7 @@ dependencies {
     ksp(libs.androidx.room.compiler)
 
     // Import the Firebase BoM
-    implementation(libs.firebase.bom)
+    implementation(platform(libs.firebase.bom))
 
 
     // TODO: Add the dependencies for Firebase products you want to use

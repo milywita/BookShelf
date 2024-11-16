@@ -5,7 +5,7 @@ import com.example.bookapp.data.repository.AuthRepository
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 
-// Implements ViewModelProvider.Factory to create ViewModels with dependencies
+// Responsible for creating instances of AuthViewModel with the proper dependencies
 class AuthViewModelFactory(
 
     private val authRepository: AuthRepository
@@ -21,4 +21,9 @@ class AuthViewModelFactory(
     }
 
 }
-
+/*
+- Organization: Everything is set up properly
+- Reusability: Can create ViewModels anywhere in the app
+- Testing: Easy to provide test versions of dependencies
+- Clean Code: Proper way to create ViewModels with dependencies
+ */

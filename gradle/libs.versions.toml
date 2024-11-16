@@ -15,12 +15,14 @@ mockitoCore = "5.7.0"
 mockitoKotlin = "5.3.1"
 retrofit = "2.11.0"
 moshiKotlin = "1.15.1"
+robolectric = "4.11.1"
 room-gradle = "2.6.1"
 room = "2.6.1"
 ksp = "2.0.21-1.0.27"
 junitKtx = "1.2.1"
 uiTestJunit4Android = "1.7.5"
 navigationCompose = "2.8.4"
+uiTestManifest = "1.7.5"
 
 
 [libraries]
@@ -63,6 +65,8 @@ androidx-room-compiler = { group = "androidx.room", name = "room-compiler", vers
 androidx-junit-ktx = { group = "androidx.test.ext", name = "junit-ktx", version.ref = "junitKtx" }
 androidx-ui-test-junit4-android = { group = "androidx.compose.ui", name = "ui-test-junit4-android", version.ref = "uiTestJunit4Android" }
 androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
+robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
+ui-test-manifest = { module = "androidx.compose.ui:ui-test-manifest", version.ref = "uiTestManifest" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

@@ -1,5 +1,10 @@
+// Book.kt
+/**
+ * Domain model representing a book throughout the application.
+ * Provides default values for optional fields.
+ */
 package com.example.bookapp.domain.model
-// Initial book model
+
 data class Book(
     val id: String = "",
     val title: String,

@@ -1,4 +1,8 @@
 // LoginScreen.kt
+/**
+ * Composable screen handling user login.
+ * Provides email/password input and validation with error handling.
+ */
 package com.example.bookapp.ui.screens.auth
 
 import androidx.compose.foundation.layout.*
@@ -16,9 +20,9 @@ import androidx.compose.ui.unit.dp
 
 @Composable
 fun LoginScreen(
-    viewModel: AuthViewModel, // For state management and login logic
-    onLoginSuccess: () -> Unit, // Callback for successful login
-    onNavigateToRegister: () -> Unit // Callback to navigate to registration
+    viewModel: AuthViewModel,
+    onLoginSuccess: () -> Unit,
+    onNavigateToRegister: () -> Unit
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -31,10 +35,8 @@ fun LoginScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // Shows welcome text
         Text(text = "Welcome Back", style = MaterialTheme.typography.headlineMedium)
 
-        // Show registration success message if applicable
         if (state.registrationSuccessful) {
             Spacer(modifier = Modifier.height(8.dp))
             Text(
@@ -44,7 +46,6 @@ fun LoginScreen(
             )
         }
 
-        // Show error message here, right after the header
         if (state.error != null) {
             Spacer(modifier = Modifier.height(8.dp))
             Card(
@@ -63,7 +64,6 @@ fun LoginScreen(
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // Rest of your login form...
         OutlinedTextField(
             value = email,
             onValueChange = { email = it },
@@ -104,19 +104,3 @@ fun LoginScreen(
         }
     }
 }
-
-/*
-Visual flow:
-
-Welcome Back Header
-       ↓
-Success/Error Messages (if any)
-       ↓
-Email Input Field
-       ↓
-Password Input Field
-       ↓
-Sign In Button
-       ↓
-Register Link
- */

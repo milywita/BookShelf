@@ -1,3 +1,8 @@
+// BookSearchScreen.kt
+/**
+ * Main screen for book search functionality. Provides search interface and displays both search
+ * results and saved books.
+ */
 package com.example.bookapp.ui.screens
 
 import android.app.Application
@@ -19,151 +24,94 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.bookapp.domain.model.Book
 
-// Main search screen with saved books toggle
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BookSearchScreen(
-    // Callback function for sign out action, defaults to empty function
     onSignOut: () -> Unit = {},
-    // Initialize ViewModel with custom factory
-    viewModel: BookSearchViewModel = viewModel(
-        factory = BookSearchViewModelFactory.provide(LocalContext.current.applicationContext as Application)
-    )
+    viewModel: BookSearchViewModel =
+        viewModel(
+            factory =
+                BookSearchViewModelFactory.provide(
+                    LocalContext.current.applicationContext as Application))
 ) {
-    // Get current Android context for Toast messages
-    val context = LocalContext.current
-    // Collect UI state from ViewModel as State<SearchState>
-    val state by viewModel.state.collectAsState()
-    // Collect saved books as State<List<Book>>
-    val savedBooks by viewModel.savedBooks.collectAsState()
+  val context = LocalContext.current
+  val state by viewModel.state.collectAsState()
+  val savedBooks by viewModel.savedBooks.collectAsState()
 
-    // Side effect to show toast messages when they change
-    LaunchedEffect(state.message) {
-        state.message?.let { message ->
-            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-            viewModel.clearMessage()
-        }
+  // Message display handling using Toast
+  LaunchedEffect(state.message) {
+    state.message?.let { message ->
+      Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+      viewModel.clearMessage()
     }
+  }
 
-    // If a book is selected, show the detail screen
-    state.selectedBook?.let { book ->
-        BookDetailScreen(
-            book = book,
-            onBackClick = viewModel::onBackClick,
-            onSaveClick = viewModel::saveBook
-        )
-        return
-    }
+  state.selectedBook?.let { book ->
+    BookDetailScreen(
+        book = book, onBackClick = viewModel::onBackClick, onSaveClick = viewModel::saveBook)
+    return
+  }
 
-    // Main screen scaffold with top app bar
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Book Search") },
-                // Add sign out button to app bar
-                actions = {
-                    IconButton(onClick = onSignOut) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ExitToApp,
-                            contentDescription = "Sign Out"
-                        )
-                    }
-                },
-                // Style the app bar using Material3 colors
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
-                )
-            )
-        }
-    ) { padding ->
-        // Main content column
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding) // Apply scaffold padding
-                .padding(16.dp)   // Add additional padding for content
-        ) {
-            // Toggle button to switch between search and saved books
-            Button(
-                onClick = viewModel::toggleSavedBooks,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 8.dp)
-            ) {
+  Scaffold(
+      topBar = {
+        TopAppBar(
+            title = { Text("Book Search") },
+            actions = {
+              IconButton(onClick = onSignOut) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ExitToApp,
+                    contentDescription = "Sign Out")
+              }
+            },
+            colors =
+                TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer))
+      }) { padding ->
+        Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
+          Button(
+              onClick = viewModel::toggleSavedBooks,
+              modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
                 Text(if (state.isShowingSavedBooks) "Show Search" else "Show Saved Books")
+              }
+
+          if (state.isShowingSavedBooks) {
+            LazyColumn(modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) {
+              items(savedBooks) { book ->
+                BookItem(book = book, onClick = { viewModel.onBookClick(book) })
+              }
+            }
+          } else {
+            TextField(
+                value = state.searchQuery,
+                onValueChange = viewModel::onSearchQueryChange,
+                label = { Text("Search for books") },
+                placeholder = { Text("Enter book title") },
+                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp))
+
+            Button(onClick = viewModel::onSearchClick, modifier = Modifier.fillMaxWidth()) {
+              Text("Search")
             }
 
-            // Conditional UI based on whether showing saved books or search
-            if (state.isShowingSavedBooks) {
-                // Display saved books in a scrollable list
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 16.dp)
-                ) {
-                    items(savedBooks) { book ->
-                        BookItem(book = book, onClick = { viewModel.onBookClick(book) })
-                    }
-                }
-            } else {
-                // Search interface
-                // Search input field
-                TextField(
-                    value = state.searchQuery,
-                    onValueChange = viewModel::onSearchQueryChange,
-                    label = { Text("Search for books") },
-                    placeholder = { Text("Enter book title") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 16.dp)
-                )
-
-                // Search button
-                Button(
-                    onClick = viewModel::onSearchClick,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Search")
-                }
-
-                // Search results list
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 16.dp)
-                ) {
-                    items(state.books) { book ->
-                        BookItem(book = book, onClick = { viewModel.onBookClick(book) })
-                    }
-                }
+            LazyColumn(modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) {
+              items(state.books) { book ->
+                BookItem(book = book, onClick = { viewModel.onBookClick(book) })
+              }
             }
+          }
         }
-    }
+      }
 }
 
-// Reusable composable for displaying individual book items
+/**
+ * Reusable composable for displaying individual book items in lists.
+ */
+
 @Composable
-fun BookItem(
-    book: Book,
-    onClick: () -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp)
-            .clickable(onClick = onClick) // Make entire card clickable
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            // Book title with medium emphasis
-            Text(
-                text = book.title,
-                style = MaterialTheme.typography.titleMedium
-            )
-            // Author name with less emphasis
-            Text(
-                text = "By ${book.author}",
-                style = MaterialTheme.typography.bodyMedium
-            )
-        }
+fun BookItem(book: Book, onClick: () -> Unit) {
+  Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).clickable(onClick = onClick)) {
+    Column(modifier = Modifier.padding(16.dp)) {
+      Text(text = book.title, style = MaterialTheme.typography.titleMedium)
+      Text(text = "By ${book.author}", style = MaterialTheme.typography.bodyMedium)
     }
+  }
 }

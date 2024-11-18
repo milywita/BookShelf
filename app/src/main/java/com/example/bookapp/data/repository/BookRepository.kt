@@ -1,3 +1,9 @@
+// BookRepository.kt
+/**
+ * Repository layer that handles data operations between the Google Books API
+ * and local Room database, providing a clean API for the ViewModel layer.
+ */
+
 package com.example.bookapp.data.repository
 
 import com.example.bookapp.data.api.BookService
@@ -8,13 +14,12 @@ import com.example.bookapp.domain.model.Book
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-// Connects database and network operations
-
 class BookRepository(private val bookService: BookService, private val bookDao: BookDao) {
-  // Network operation - Get books from API
+
   suspend fun searchBooks(query: String): List<Book> {
     return try {
       val response = bookService.searchBooks(query)
+      // Map API response to domain model, providing default values for nullable fields
       response.items?.map { bookItem ->
         val volumeInfo = bookItem.volumeInfo
         Book(
@@ -32,7 +37,6 @@ class BookRepository(private val bookService: BookService, private val bookDao: 
     }
   }
 
-  // Database operations
   fun getSavedBooks(): Flow<List<Book>> {
     return bookDao.getAllBooks().map { entities -> entities.map { it.toBook() } }
   }

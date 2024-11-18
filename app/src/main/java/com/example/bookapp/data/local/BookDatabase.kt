@@ -1,3 +1,8 @@
+// BookDatabase.kt
+/**
+ * Room database implementation for local book storage. Provides data persistence and offline access
+ * capability.
+ */
 package com.example.bookapp.data.local
 
 import android.content.Context
@@ -7,7 +12,6 @@ import androidx.room.RoomDatabase
 import com.example.bookapp.data.local.dao.BookDao
 import com.example.bookapp.data.local.entity.BookEntity
 
-// Main database class
 @Database(entities = [BookEntity::class], version = 1, exportSchema = true)
 abstract class BookDatabase : RoomDatabase() {
   abstract fun bookDao(): BookDao
@@ -18,6 +22,7 @@ abstract class BookDatabase : RoomDatabase() {
     fun getDatabase(context: Context): BookDatabase {
       return INSTANCE
           ?: synchronized(this) {
+            // Create database if it doesn't exist
             val instance =
                 Room.databaseBuilder(
                         context.applicationContext, BookDatabase::class.java, "book_database")

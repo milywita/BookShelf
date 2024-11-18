@@ -1,3 +1,9 @@
+// BookDetailScreen.kt
+/**
+ * Composable that displays detailed information about a book,
+ * including its title, author, publication details, and description.
+ * Provides options to navigate back or save the book.
+ */
 package com.example.bookapp.ui.screens
 
 import androidx.compose.foundation.layout.*
@@ -10,15 +16,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.bookapp.domain.model.Book
 
-// Book detail screen
 @Composable
-fun BookDetailScreen(
-    book: Book,
-    onBackClick: () -> Unit,
-    onSaveClick: (Book) -> Unit = {} // Add this parameter
-) {
+fun BookDetailScreen(book: Book, onBackClick: () -> Unit, onSaveClick: (Book) -> Unit = {}) {
   Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
-    // Buttons row
+    // Navigation and action buttons
     Row(
         modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
         horizontalArrangement = Arrangement.SpaceBetween) {
@@ -27,13 +28,12 @@ fun BookDetailScreen(
           Button(onClick = { onSaveClick(book) }) { Text("Save Book") }
         }
 
-    // temporary Text to verify ID
     Text(
         text = "Book ID: ${book.id}",
         style = MaterialTheme.typography.bodySmall,
         modifier = Modifier.padding(bottom = 8.dp))
 
-    // Book details
+    // Book details layout
     Text(
         text = book.title,
         style = MaterialTheme.typography.headlineMedium,
@@ -44,6 +44,7 @@ fun BookDetailScreen(
         style = MaterialTheme.typography.titleMedium,
         modifier = Modifier.padding(bottom = 16.dp))
 
+    // Only show optional fields if they contain data
     if (book.publishedDate.isNotBlank()) {
       Text(
           text = "Published: ${book.publishedDate}",

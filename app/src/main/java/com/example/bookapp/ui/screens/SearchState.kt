@@ -1,6 +1,10 @@
+// SearchState.kt
+/**
+ * Data class representing the UI state for book search functionality.
+ * Handles search query, results, selected book, messages, and view toggles.
+ */
 package com.example.bookapp.ui.screens
 
-import android.app.DownloadManager.Query
 import com.example.bookapp.domain.model.Book
 
 data class SearchState(
@@ -9,5 +13,4 @@ data class SearchState(
     val selectedBook: Book? = null,
     val message: String? = null,
     val isShowingSavedBooks: Boolean = false
-
 )

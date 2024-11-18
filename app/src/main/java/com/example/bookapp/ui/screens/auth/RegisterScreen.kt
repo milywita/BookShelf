@@ -1,3 +1,8 @@
+// RegisterScreen.kt
+/**
+ * Composable screen for user registration. Handles user input validation, password confirmation,
+ * and registration state.
+ */
 package com.example.bookapp.ui.screens.auth
 
 import androidx.compose.foundation.layout.Arrangement
@@ -28,13 +33,14 @@ import androidx.compose.ui.unit.dp
 
 @Composable
 fun RegisterScreen(
-    viewModel: AuthViewModel, // Same AuthViewModel used in LoginScreen
-    onRegisterSuccess: () -> Unit, // Callback for successful registration
-    onNavigateToLogin: () -> Unit // Callback to return to login screen
+    viewModel: AuthViewModel,
+    onRegisterSuccess: () -> Unit,
+    onNavigateToLogin: () -> Unit
 ) {
+  // State management for form fields
   var email by remember { mutableStateOf("") }
   var password by remember { mutableStateOf("") }
-  var confirmPassword by remember { mutableStateOf("") } // Additional field for registration
+  var confirmPassword by remember { mutableStateOf("") }
 
   val state = viewModel.state.collectAsState().value
 
@@ -44,7 +50,6 @@ fun RegisterScreen(
       verticalArrangement = Arrangement.Center) {
         Text(text = "Create Account", style = MaterialTheme.typography.headlineMedium)
 
-        // Show error message here, right after the header
         if (state.error != null) {
           Spacer(modifier = Modifier.height(8.dp))
           Card(
@@ -62,7 +67,6 @@ fun RegisterScreen(
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // Email field
         OutlinedTextField(
             value = email,
             onValueChange = { email = it },
@@ -71,7 +75,6 @@ fun RegisterScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Password field
         OutlinedTextField(
             value = password,
             onValueChange = { password = it },
@@ -81,7 +84,6 @@ fun RegisterScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Confirm password field (unique to registration)
         OutlinedTextField(
             value = confirmPassword,
             onValueChange = { confirmPassword = it },
@@ -93,18 +95,14 @@ fun RegisterScreen(
 
         Button(
             onClick = {
-              // Checks if passwords match
               if (password == confirmPassword) {
                 viewModel.register(email, password)
               } else {
-                // Update the error state using the viewModel function, handles error display for
-                // password mismatch
                 viewModel.updateErrorState("Passwords do not match")
               }
             },
             modifier = Modifier.fillMaxWidth(),
             enabled =
-                // Shows loading state
                 !state.isLoading &&
                     email.isNotEmpty() &&
                     password.isNotEmpty() &&
@@ -114,12 +112,9 @@ fun RegisterScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Link to return to login screen
         TextButton(onClick = onNavigateToLogin) { Text("Already have an account? Log in") }
       }
 
-  // Watches for successful registration
-  // Navigates back to login screen on success
   LaunchedEffect(state.registrationSuccessful) {
     if (state.registrationSuccessful) {
       onRegisterSuccess()

@@ -1,10 +1,14 @@
+// BookEntity.kt
+/**
+ * Room entity representing a saved book in the local database.
+ * Includes mapping functions to convert between domain and database models.
+ */
 package com.example.bookapp.data.local.entity
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.example.bookapp.domain.model.Book
 
-// Entity - structure our data in database
 @Entity(tableName = "books")
 data class BookEntity(
     @PrimaryKey val id: String,
@@ -17,7 +21,7 @@ data class BookEntity(
     val categories: String
 )
 
-// Conversion functions
+// Extension functions for model conversion
 fun Book.toBookEntity() =
     BookEntity(
         id = id,
@@ -27,6 +31,7 @@ fun Book.toBookEntity() =
         thumbnailUrl = thumbnailUrl,
         publishedDate = publishedDate,
         pageCount = pageCount,
+        // Categories stored as comma-separated string for database efficiency
         categories = categories.joinToString(","))
 
 fun BookEntity.toBook() =

@@ -1,11 +1,15 @@
+// BookResponse.kt
+/**
+ * Data classes for parsing Google Books API responses.
+ * Uses Moshi annotations for JSON deserialization.
+ */
 package com.example.bookapp.data.model
+
 import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 
 @JsonClass(generateAdapter = true)
-data class BookResponse(
-    @Json(name = "items") val items: List<BookItem>? = null
-)
+data class BookResponse(@Json(name = "items") val items: List<BookItem>? = null)
 
 @JsonClass(generateAdapter = true)
 data class BookItem(
@@ -19,13 +23,10 @@ data class VolumeInfo(
     @Json(name = "authors") val authors: List<String>? = null,
     @Json(name = "description") val description: String? = null,
     @Json(name = "imageLinks") val imageLinks: ImageLinks? = null,
-    // ADDED: New fields
     @Json(name = "publishedDate") val publishedDate: String? = null,
     @Json(name = "pageCount") val pageCount: Int? = null,
     @Json(name = "categories") val categories: List<String>? = null
 )
 
 @JsonClass(generateAdapter = true)
-data class ImageLinks(
-    @Json(name = "thumbnail") val thumbnail: String? = null
-)
+data class ImageLinks(@Json(name = "thumbnail") val thumbnail: String? = null)

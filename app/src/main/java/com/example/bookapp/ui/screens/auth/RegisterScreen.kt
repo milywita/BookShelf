@@ -20,6 +20,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -43,6 +44,8 @@ fun RegisterScreen(
   var confirmPassword by remember { mutableStateOf("") }
 
   val state = viewModel.state.collectAsState().value
+
+  DisposableEffect(Unit) { onDispose { viewModel.clearError() } }
 
   Column(
       modifier = Modifier.fillMaxSize().padding(16.dp),

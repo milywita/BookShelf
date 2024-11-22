@@ -97,7 +97,10 @@ class AuthViewModel(private val authRepository: AuthRepository) : ViewModel() {
   fun updateErrorState(errorMessage: String) {
     _state.value = _state.value.copy(error = errorMessage)
   }
-  // TODO: Clear the error state when navigating between screens
+
+  fun clearError(){
+    _state.value = _state.value.copy(error = null)
+  }
 }
 
 data class AuthState(

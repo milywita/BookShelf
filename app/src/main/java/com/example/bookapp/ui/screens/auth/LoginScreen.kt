@@ -1,7 +1,7 @@
 // LoginScreen.kt
 /**
- * Composable screen handling user login.
- * Provides email/password input and validation with error handling.
+ * Composable screen handling user login. Provides email/password input and validation with error
+ * handling.
  */
 package com.example.bookapp.ui.screens.auth
 
@@ -24,52 +24,49 @@ fun LoginScreen(
     onLoginSuccess: () -> Unit,
     onNavigateToRegister: () -> Unit
 ) {
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    val state = viewModel.state.collectAsState().value
+  var email by remember { mutableStateOf("") }
+  var password by remember { mutableStateOf("") }
+  val state = viewModel.state.collectAsState().value
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
+  DisposableEffect(Unit) { onDispose { viewModel.clearError() } }
+
+  Column(
+      modifier = Modifier.fillMaxSize().padding(16.dp),
+      horizontalAlignment = Alignment.CenterHorizontally,
+      verticalArrangement = Arrangement.Center) {
         Text(text = "Welcome Back", style = MaterialTheme.typography.headlineMedium)
 
         if (state.registrationSuccessful) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Registration successful! Please sign in.",
-                color = MaterialTheme.colorScheme.primary,
-                style = MaterialTheme.typography.bodyMedium
-            )
+          Spacer(modifier = Modifier.height(8.dp))
+          Text(
+              text = "Registration successful! Please sign in.",
+              color = MaterialTheme.colorScheme.primary,
+              style = MaterialTheme.typography.bodyMedium)
         }
 
         if (state.error != null) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer,
-                )
-            ) {
+          Spacer(modifier = Modifier.height(8.dp))
+          Card(
+              colors =
+                  CardDefaults.cardColors(
+                      containerColor = MaterialTheme.colorScheme.errorContainer,
+                  )) {
                 Text(
                     text = state.error,
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.padding(8.dp),
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
+                    style = MaterialTheme.typography.bodyMedium)
+              }
         }
 
         Spacer(modifier = Modifier.height(32.dp))
 
         OutlinedTextField(
             value = email,
-            onValueChange = { email = it },
+            onValueChange = { email = it.trim() },
             label = { Text("Email") },
-            modifier = Modifier.fillMaxWidth()
-        )
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true)
 
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -78,29 +75,26 @@ fun LoginScreen(
             onValueChange = { password = it },
             label = { Text("Password") },
             visualTransformation = PasswordVisualTransformation(),
-            modifier = Modifier.fillMaxWidth()
-        )
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true)
 
         Spacer(modifier = Modifier.height(32.dp))
 
         Button(
-            onClick = { viewModel.signIn(email, password) },
+            onClick = { viewModel.signIn(email.trim(), password) },
             modifier = Modifier.fillMaxWidth(),
-            enabled = !state.isLoading && email.isNotEmpty() && password.isNotEmpty()
-        ) {
-            Text(if (state.isLoading) "Signing in..." else "Sign In")
-        }
+            enabled = !state.isLoading && email.trim().isNotEmpty() && password.isNotEmpty()) {
+              Text(if (state.isLoading) "Signing in..." else "Sign In")
+            }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        TextButton(onClick = onNavigateToRegister) {
-            Text("Don't have an account? Register")
-        }
-    }
+        TextButton(onClick = onNavigateToRegister) { Text("Don't have an account? Register") }
+      }
 
-    LaunchedEffect(state.isLoggedIn) {
-        if (state.isLoggedIn) {
-            onLoginSuccess()
-        }
+  LaunchedEffect(state.isLoggedIn) {
+    if (state.isLoggedIn) {
+      onLoginSuccess()
     }
+  }
 }

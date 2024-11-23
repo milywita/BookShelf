@@ -1,8 +1,7 @@
 // BookDetailScreen.kt
 /**
- * Composable that displays detailed information about a book,
- * including its title, author, publication details, and description.
- * Provides options to navigate back or save the book.
+ * Composable that displays detailed information about a book, including its title, author,
+ * publication details, and description. Provides options to navigate back or save the book.
  */
 package com.example.bookapp.ui.screens
 
@@ -17,15 +16,29 @@ import androidx.compose.ui.unit.dp
 import com.example.bookapp.domain.model.Book
 
 @Composable
-fun BookDetailScreen(book: Book, onBackClick: () -> Unit, onSaveClick: (Book) -> Unit = {}) {
+fun BookDetailScreen(
+    book: Book,
+    onBackClick: () -> Unit,
+    onSaveClick: (Book) -> Unit = {},
+    onDeleteClick: (String) -> Unit = {},
+    isBookSaved: Boolean
+) {
   Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
     // Navigation and action buttons
     Row(
         modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
         horizontalArrangement = Arrangement.SpaceBetween) {
           Button(onClick = onBackClick) { Text("Back to Search") }
-
-          Button(onClick = { onSaveClick(book) }) { Text("Save Book") }
+          if (isBookSaved) {
+            Button(
+                onClick = { onDeleteClick(book.id) },
+                colors =
+                    ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) {
+                  Text("Delete Book")
+                }
+          } else {
+            Button(onClick = { onSaveClick(book) }) { Text("Save Book") }
+          }
         }
 
     Text(

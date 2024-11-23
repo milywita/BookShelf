@@ -48,7 +48,11 @@ fun BookSearchScreen(
 
   state.selectedBook?.let { book ->
     BookDetailScreen(
-        book = book, onBackClick = viewModel::onBackClick, onSaveClick = viewModel::saveBook)
+        book = book,
+        onBackClick = viewModel::onBackClick,
+        onSaveClick = viewModel::saveBook,
+        onDeleteClick = viewModel::deleteBook,
+        isBookSaved = viewModel.isBookSaved(book.id))
     return
   }
 
@@ -102,10 +106,7 @@ fun BookSearchScreen(
       }
 }
 
-/**
- * Reusable composable for displaying individual book items in lists.
- */
-
+/** Reusable composable for displaying individual book items in lists. */
 @Composable
 fun BookItem(book: Book, onClick: () -> Unit) {
   Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).clickable(onClick = onClick)) {

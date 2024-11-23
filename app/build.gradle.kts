@@ -118,15 +118,6 @@ dependencies {
     // Import the Firebase BoM
     implementation(platform(libs.firebase.bom))
 
-
-    // TODO: Add the dependencies for Firebase products you want to use
-    // When using the BoM, don't specify versions in Firebase dependencies
-    implementation(libs.firebase.analytics)
-
-
-    // Add the dependencies for any other desired Firebase products
-    // https://firebase.google.com/docs/android/setup#available-libraries
-
     // Testing
     testImplementation(libs.junit)
     testImplementation(libs.mockito.core)
@@ -147,6 +138,13 @@ dependencies {
     testImplementation(libs.robolectric)
     debugImplementation(libs.ui.test.manifest)
 
+    // Firebase
+
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.analytics)
+    implementation(libs.firebase.auth)
+    implementation(libs.firebase.firestore)
+    implementation(libs.firebase.coroutines.play.services)
 
 }
 

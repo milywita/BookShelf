@@ -13,6 +13,10 @@ android {
     namespace = "com.example.bookapp"
     compileSdk = 35
 
+    buildFeatures {
+        buildConfig = true
+    }
+
     defaultConfig {
         applicationId = "com.example.bookapp"
         minSdk = 24

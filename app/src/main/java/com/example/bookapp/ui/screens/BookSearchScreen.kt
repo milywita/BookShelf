@@ -18,7 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.bookapp.domain.model.Book
-import firebase.com.protolitewrapper.BuildConfig
+import com.example.bookapp.BuildConfig
 
 @Composable
 fun BookSearchScreen(

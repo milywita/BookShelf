@@ -12,30 +12,24 @@ import androidx.room.RoomDatabase
 import com.example.bookapp.data.local.dao.BookDao
 import com.example.bookapp.data.local.entity.BookEntity
 
-@Database(entities = [BookEntity::class], version = 2, exportSchema = true)
-
+@Database(entities = [BookEntity::class], version = 1, exportSchema = true)
 abstract class BookDatabase : RoomDatabase() {
-    abstract fun bookDao(): BookDao
+  abstract fun bookDao(): BookDao
 
-    companion object {
-        @Volatile
-        private var INSTANCE: BookDatabase? = null
-        private const val DATABASE_NAME = "book_database"
+  companion object {
+    @Volatile private var INSTANCE: BookDatabase? = null
 
-
-        fun getDatabase(context: Context): BookDatabase {
-            return INSTANCE ?: synchronized(this) {
-                createDatabase(context).also { INSTANCE = it }
-            }
-        }
-
-        private fun createDatabase(context: Context) =
-            Room.databaseBuilder(
-                context.applicationContext,
-                BookDatabase::class.java,
-                DATABASE_NAME
-            )
-                .fallbackToDestructiveMigration()
-                .build()
+    fun getDatabase(context: Context): BookDatabase {
+      return INSTANCE
+          ?: synchronized(this) {
+            // Create database if it doesn't exist
+            val instance =
+                Room.databaseBuilder(
+                        context.applicationContext, BookDatabase::class.java, "book_database")
+                    .build()
+            INSTANCE = instance
+            instance
+          }
     }
+  }
 }

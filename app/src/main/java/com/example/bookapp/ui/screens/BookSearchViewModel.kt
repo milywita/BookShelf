@@ -1,69 +1,46 @@
+// BookSearchViewModel.kt
+/**
+ * ViewModel handling book search functionality and state management.
+ * Coordinates between UI layer and repositories for search and save operations.
+ */
 package com.example.bookapp.ui.screens
 
 import android.app.Application
-import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.bookapp.data.di.NetworkModule
 import com.example.bookapp.data.local.BookDatabase
-import com.example.bookapp.data.model.firebase.FirebaseBook
-import com.example.bookapp.data.repository.*
+import com.example.bookapp.data.repository.BookRepository
+import com.example.bookapp.data.repository.BookSyncRepository
+import com.example.bookapp.data.repository.FirestoreRepository
 import com.example.bookapp.domain.model.Book
-import com.google.firebase.auth.FirebaseAuth
-import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.*
-
-sealed class BookSearchEvent {
-  data class SearchError(val error: Throwable) : BookSearchEvent()
-  object SyncSuccess : BookSearchEvent()
-  data class SyncError(val error: Throwable) : BookSearchEvent()
-}
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.toCollection
+import kotlinx.coroutines.launch
 
 class BookSearchViewModel(application: Application) : AndroidViewModel(application) {
-  private val viewModelJob = SupervisorJob()
-  private val ioScope = CoroutineScope(viewModelJob + Dispatchers.IO)
-
-  data class DebugInfo(
-    val isVisible: Boolean = false,
-    val currentUserId: String = "",
-    val localBookIds: List<String> = emptyList(),
-    val firestoreBookIds: List<String> = emptyList(),
-    val localOnlyBookIds: List<String> = emptyList()
-  )
-
   private val database = BookDatabase.getDatabase(getApplication())
-  private val auth = FirebaseAuth.getInstance()
   private val bookRepository = BookRepository(
     bookService = NetworkModule.bookService,
-    bookDao = database.bookDao(),
-    auth = auth
+    bookDao = database.bookDao()
   )
   private val firestoreRepository = FirestoreRepository()
   private val bookSyncRepository = BookSyncRepository(
     bookDao = database.bookDao(),
-    firestoreRepository = firestoreRepository,
-    auth = auth
+    firestoreRepository = firestoreRepository
   )
 
   private val _state = MutableStateFlow(SearchState())
-  val state = _state.asStateFlow()
-
-  private val _events = MutableSharedFlow<BookSearchEvent>()
-
-  private val _debugInfo = MutableStateFlow(DebugInfo())
-  val debugInfo = _debugInfo.asStateFlow()
+  val state: StateFlow<SearchState> = _state.asStateFlow()
 
   private var _savedBookIds = mutableSetOf<String>()
-  private val _firestoreBooks = mutableSetOf<String>()
 
-  private val _localBooksExist = MutableStateFlow(false)
-  val localBooksExist = _localBooksExist.asStateFlow()
-
+  // Books from both local storage and cloud
   val savedBooks = bookSyncRepository.getSavedBooks()
-    .catch { e ->
-      logError("Error collecting saved books", e)
-      emit(emptyList())
-    }
     .stateIn(
       scope = viewModelScope,
       started = SharingStarted.WhileSubscribed(5000),
@@ -71,232 +48,142 @@ class BookSearchViewModel(application: Application) : AndroidViewModel(applicati
     )
 
   init {
-    setupObservers()
-  }
+    // Initial sync with Firestore when ViewModel is created
+    syncWithFirestore()
 
-  private fun setupObservers() {
     viewModelScope.launch {
-      observeAuthState()
-      observeFirestoreBooks()
-      observeSavedBooks()
-    }
-  }
-
-  private fun observeAuthState() {
-    auth.addAuthStateListener { firebaseAuth ->
-      val user = firebaseAuth.currentUser
-      logDebug("Auth state changed, user: ${user?.uid}")
-
-      viewModelScope.launch {
-        if (user != null) {
-          try {
-            syncWithFirestore()
-          } catch (e: Exception) {
-            logError("Error syncing with Firestore", e)
-          }
-        } else {
-          // Cancel ongoing operations first
-          viewModelJob.cancelChildren()
-          clearLocalState()
-
-          // Reset state
-          _state.value = SearchState()
-          _debugInfo.value = DebugInfo()
-        }
+      savedBooks.collect { books ->
+        _savedBookIds = books.map { it.id }.toMutableSet()
       }
     }
   }
 
-  private fun observeFirestoreBooks() = ioScope.launch {
-    firestoreRepository.getUserBookStream()
-      .catch { e ->
-        logError("Error in Firestore stream", e)
-        emit(emptyList())
+  fun isBookSaved(bookId: String): Boolean {
+    return _savedBookIds.contains(bookId)
+  }
+
+  private fun syncWithFirestore() {
+    viewModelScope.launch {
+      try {
+        bookSyncRepository.syncWithFirestore()
+      } catch (e: Exception) {
+        _state.value = _state.value.copy(
+          message = "Failed to sync with cloud: ${e.message}"
+        )
       }
-      .collect { firebaseBooks ->
-        logDebug("Received ${firebaseBooks.size} books from Firestore")
-        updateFirestoreBooks(firebaseBooks)
-      }
-  }
-
-  private fun observeSavedBooks() = ioScope.launch {
-    savedBooks
-      .catch { e ->
-        Log.e(TAG, "Error collecting saved books", e)
-        emitAll(flowOf(emptyList()))
-      }
-      .collect { books ->
-        logDebug("Received ${books.size} saved books")
-        updateSavedBooks(books)
-      }
-  }
-
-  private fun updateFirestoreBooks(books: List<FirebaseBook>) {
-    _firestoreBooks.clear()
-    _firestoreBooks.addAll(books.map { it.id })
-    checkLocalBooks()
-  }
-
-  private fun updateSavedBooks(books: List<Book>) {
-    _savedBookIds = books.map { it.id }.toMutableSet()
-    checkLocalBooks()
-  }
-
-  private fun clearLocalState() {
-    _firestoreBooks.clear()
-    _savedBookIds.clear()
-    _localBooksExist.value = false
-  }
-
-  fun toggleDebugInfo() {
-    _debugInfo.value = _debugInfo.value.copy(isVisible = !_debugInfo.value.isVisible)
-    if (_debugInfo.value.isVisible) {
-      updateDebugInfo()
-    }
-  }
-
-  private fun checkLocalBooks() = viewModelScope.launch {
-    try {
-      val localOnlyBooks = savedBooks.first().filter { book ->
-        val isLocalOnly = !_firestoreBooks.contains(book.id)
-        logDebug("Book ${book.title} (${book.id}) is local only: $isLocalOnly")
-        isLocalOnly
-      }
-      _localBooksExist.value = localOnlyBooks.isNotEmpty()
-      updateDebugInfo()
-    } catch (e: Exception) {
-      logError("Error checking local books", e)
-    }
-  }
-
-  private fun updateDebugInfo() = viewModelScope.launch {
-    try {
-      _debugInfo.value = _debugInfo.value.copy(
-        currentUserId = auth.currentUser?.uid ?: "No user",
-        localBookIds = savedBooks.first().map { it.id },
-        firestoreBookIds = _firestoreBooks.toList(),
-        localOnlyBookIds = savedBooks.first()
-          .filter { !_firestoreBooks.contains(it.id) }
-          .map { it.id }
-      )
-    } catch (e: Exception) {
-      logError("Error updating debug info", e)
-    }
-  }
-
-  fun isBookSaved(bookId: String) = _savedBookIds.contains(bookId)
-
-  private fun syncWithFirestore() = viewModelScope.launch {
-    try {
-      logDebug("Starting Firestore sync")
-      bookSyncRepository.syncWithFirestore()
-      checkLocalBooks()
-      emitEvent(BookSearchEvent.SyncSuccess)
-    } catch (e: Exception) {
-      logError("Sync failed", e)
-      emitEvent(BookSearchEvent.SyncError(e))
-      updateState { copy(message = "Failed to sync with cloud: ${e.message}") }
-    }
-  }
-
-  fun migrateLocalBooks() = viewModelScope.launch {
-    try {
-      val localOnlyBooks = savedBooks.first().filter { !_firestoreBooks.contains(it.id) }
-      logDebug("Found ${localOnlyBooks.size} local-only books to migrate")
-
-      if (localOnlyBooks.isEmpty()) {
-        updateState { copy(message = "No local-only books to migrate") }
-        return@launch
-      }
-
-      localOnlyBooks.forEach { book ->
-        logDebug("Migrating book: ${book.title}")
-        firestoreRepository.saveBook(book)
-      }
-
-      syncWithFirestore()
-      updateState { copy(message = "${localOnlyBooks.size} books migrated successfully!") }
-      checkLocalBooks()
-    } catch (e: Exception) {
-      logError("Migration failed", e)
-      updateState { copy(message = "Error migrating books: ${e.message}") }
     }
   }
 
   fun onSearchQueryChange(query: String) {
-    updateState { copy(searchQuery = query) }
+    _state.value = _state.value.copy(searchQuery = query)
   }
 
-  fun onSearchClick() = viewModelScope.launch {
-    val query = state.value.searchQuery
-    if (query.isBlank()) return@launch
+  fun onSearchClick() {
+    val currentQuery = state.value.searchQuery
+    if (currentQuery.isBlank()) return
 
-    try {
-      val result = bookRepository.searchBooks(query)
-      result.fold(
-        onSuccess = { books -> updateState { copy(books = books) } },
-        onFailure = { e ->
-          emitEvent(BookSearchEvent.SearchError(e))
-          updateState { copy(message = "Search failed: ${e.message}") }
-        }
-      )
-    } catch (e: Exception) {
-      updateState { copy(message = "Search failed: ${e.message}") }
+    viewModelScope.launch {
+      try {
+        val books = bookRepository.searchBooks(currentQuery)
+        _state.value = _state.value.copy(books = books)
+      } catch (e: Exception) {
+        _state.value = _state.value.copy(
+          message = "Search failed: ${e.message}"
+        )
+      }
     }
   }
 
-  fun onBookClick(book: Book) = updateState { copy(selectedBook = book) }
-  fun onBackClick() = updateState { copy(selectedBook = null) }
-  fun clearMessage() = updateState { copy(message = null) }
-  fun toggleSavedBooks() = updateState { copy(isShowingSavedBooks = !isShowingSavedBooks) }
-
-  private fun updateState(update: SearchState.() -> SearchState) {
-    _state.value = update(_state.value)
+  fun onBookClick(book: Book) {
+    _state.value = _state.value.copy(selectedBook = book)
   }
 
-  private suspend fun emitEvent(event: BookSearchEvent) {
-    _events.emit(event)
+  fun onBackClick() {
+    _state.value = _state.value.copy(selectedBook = null)
   }
 
-  private fun logDebug(message: String) = Log.d(TAG, message)
-  private fun logError(message: String, error: Throwable? = null) = Log.e(TAG, message, error)
-
-  override fun onCleared() {
-    super.onCleared()
-    viewModelJob.cancel()
-  }
-
-  companion object {
-    private const val TAG = "BookSearchViewModel"
-  }
-
-  fun saveBook(book: Book) = viewModelScope.launch {
-    try {
-      bookSyncRepository.saveBook(book)
-      updateState { copy(message = "Book saved successfully!") }
-    } catch (e: Exception) {
-      logError("Save failed", e)
-      updateState { copy(message = "Error saving book: ${e.message}") }
+  fun saveBook(book: Book) {
+    viewModelScope.launch {
+      try {
+        bookSyncRepository.saveBook(book)
+        _state.value = _state.value.copy(
+          message = "Book saved successfully!"
+        )
+      } catch (e: Exception) {
+        _state.value = _state.value.copy(
+          message = "Error saving book: ${e.message}"
+        )
+      }
     }
   }
 
-  fun deleteBook(bookId: String) = viewModelScope.launch {
-    try {
-      bookRepository.deleteBook(bookId)
-      firestoreRepository.deleteBook(bookId)
-      updateState { copy(message = "Book deleted successfully") }
-    } catch (e: Exception) {
-      logError("Delete failed", e)
-      updateState { copy(message = "Error deleting book: ${e.message}") }
+  fun updateBookProgress(bookId: String, progress: Int) {
+    viewModelScope.launch {
+      try {
+        bookSyncRepository.updateBookProgress(bookId, progress)
+        _state.value = _state.value.copy(
+          message = "Reading progress updated"
+        )
+      } catch (e: Exception) {
+        _state.value = _state.value.copy(
+          message = "Failed to update progress: ${e.message}"
+        )
+      }
     }
   }
 
-  fun forceCheckLocalBooks() = viewModelScope.launch {
-    try {
-      checkLocalBooks()
-      updateDebugInfo()
-    } catch (e: Exception) {
-      logError("Force check failed", e)
+  fun toggleBookLike(bookId: String, isLiked: Boolean) {
+    viewModelScope.launch {
+      try {
+        bookSyncRepository.toggleBookLike(bookId, isLiked)
+        _state.value = _state.value.copy(
+          message = if (isLiked) "Book added to favorites" else "Book removed from favorites"
+        )
+      } catch (e: Exception) {
+        _state.value = _state.value.copy(
+          message = "Failed to update like status: ${e.message}"
+        )
+      }
+    }
+  }
+
+  fun updateNotes(bookId: String, notes: String) {
+    viewModelScope.launch {
+      try {
+        bookSyncRepository.updateNotes(bookId, notes)
+        _state.value = _state.value.copy(
+          message = "Notes updated successfully"
+        )
+      } catch (e: Exception) {
+        _state.value = _state.value.copy(
+          message = "Failed to update notes: ${e.message}"
+        )
+      }
+    }
+  }
+
+  fun clearMessage() {
+    _state.value = _state.value.copy(message = null)
+  }
+
+  fun toggleSavedBooks() {
+    _state.value = _state.value.copy(
+      isShowingSavedBooks = !state.value.isShowingSavedBooks
+    )
+  }
+
+  fun deleteBook(bookId: String){
+    viewModelScope.launch {
+      try {
+        bookSyncRepository.deleteBook(bookId)
+        _state.value = _state.value.copy(
+          message = "Book deleted successfully"
+        )
+      } catch (e: Exception) {
+        _state.value = _state.value.copy(
+          message = "Error deleting book: ${e.message}"
+        )
+      }
     }
   }
 }

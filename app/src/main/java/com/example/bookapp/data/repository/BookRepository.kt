@@ -5,27 +5,24 @@
  */
 package com.example.bookapp.data.repository
 
+import android.util.Log
+import com.example.bookapp.domain.error.AppError
 import com.example.bookapp.data.api.BookService
 import com.example.bookapp.data.local.dao.BookDao
 import com.example.bookapp.domain.model.Book
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import android.util.Log
-
+import java.net.UnknownHostException
+import java.net.SocketTimeoutException
 
 class BookRepository(
     private val bookService: BookService,
     private val bookDao: BookDao,
     private val auth: FirebaseAuth = FirebaseAuth.getInstance()
 ) {
-    sealed class BookError : Exception() {
-        data class NetworkError(override val cause: Throwable) : BookError()
-        data object AuthError : BookError() {
-            private fun readResolve(): Any = AuthError
-        }
-
-        data class DatabaseError(override val cause: Throwable) : BookError()
+    companion object {
+        private const val TAG = "BookRepository"
     }
 
     private val currentUserId: String?
@@ -33,6 +30,7 @@ class BookRepository(
 
     suspend fun searchBooks(query: String): Result<List<Book>> = withContext(Dispatchers.IO) {
         try {
+            Log.d(TAG, "Searching books with query: $query")
             val response = bookService.searchBooks(query)
             val books = response.items?.map { bookItem ->
                 val volumeInfo = bookItem.volumeInfo
@@ -47,23 +45,32 @@ class BookRepository(
                     categories = volumeInfo?.categories ?: emptyList()
                 )
             } ?: emptyList()
+
+            Log.d(TAG, "Found ${books.size} books for query: $query")
             Result.success(books)
         } catch (e: Exception) {
-            Log.e(TAG, "Search failed", e)
-            Result.failure(BookError.NetworkError(e))
+            val error = when (e) {
+                is UnknownHostException -> AppError.Network.NoConnection(cause = e)
+                is SocketTimeoutException -> AppError.Network.ServerError(cause = e)
+                else -> AppError.Book.SearchFailed(cause = e)
+            }
+            Log.e(TAG, "Search failed for query: $query", error)
+            Result.failure(error)
         }
     }
 
     suspend fun deleteBook(bookId: String) = withContext(Dispatchers.IO) {
         try {
-            val userId = currentUserId ?: throw BookError.AuthError
+            Log.d(TAG, "Attempting to delete book: $bookId")
+            val userId = currentUserId ?: throw AppError.Auth.UserNotFound()
             bookDao.deleteBook(bookId, userId)
+            Log.d(TAG, "Successfully deleted book: $bookId")
         } catch (e: Exception) {
-            throw BookError.DatabaseError(e)
+            Log.e(TAG, "Failed to delete book: $bookId", e)
+            throw when (e) {
+                is AppError.Auth.UserNotFound -> e
+                else -> AppError.Book.DeleteFailed(bookId = bookId, cause = e)
+            }
         }
-    }
-
-    companion object {
-        private const val TAG = "BookRepository"
     }
 }

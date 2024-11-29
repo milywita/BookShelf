@@ -11,12 +11,16 @@ import androidx.lifecycle.viewModelScope
 import com.example.bookapp.BookApplication
 import com.example.bookapp.data.local.BookDatabase
 import com.example.bookapp.data.repository.AuthRepository
+import com.example.bookapp.domain.error.AppError
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+/**
+ * Represents the authentication state of the application.
+ */
 data class AuthState(
     val isLoading: Boolean = false,
     val isLoggedIn: Boolean = false,
@@ -24,6 +28,10 @@ data class AuthState(
     val registrationSuccessful: Boolean = false
 )
 
+/**
+ * ViewModel responsible for managing authentication state and operations.
+ * Handles login, registration, and session management using Firebase Authentication.
+ */
 class AuthViewModel(private val authRepository: AuthRepository) : ViewModel() {
     companion object {
         private const val TAG = "AuthViewModel"
@@ -34,7 +42,6 @@ class AuthViewModel(private val authRepository: AuthRepository) : ViewModel() {
     val state: StateFlow<AuthState> = _state.asStateFlow()
 
     private val database by lazy {
-        // Using the proper getter method from BookApplication
         BookDatabase.getDatabase(BookApplication.getInstance())
     }
 
@@ -47,7 +54,7 @@ class AuthViewModel(private val authRepository: AuthRepository) : ViewModel() {
             updateState { copy(isLoggedIn = authRepository.getCurrentUser() != null) }
         } catch (e: Exception) {
             Log.e(TAG, "Error checking login state", e)
-            updateState { copy(error = "Failed to check login state") }
+            handleError(AppError.Auth.SessionExpired(cause = e))
         }
     }
 
@@ -58,83 +65,93 @@ class AuthViewModel(private val authRepository: AuthRepository) : ViewModel() {
             }
             authRepository.signOut()
             updateState { copy(isLoggedIn = false) }
+            Log.d(TAG, "User signed out successfully")
         } catch (e: Exception) {
             Log.e(TAG, "Error during sign out", e)
-            updateState { copy(error = "Failed to sign out properly") }
+            handleError(AppError.Auth.SignOutError(cause = e))
         }
     }
 
     private fun isValidForm(email: String, password: String): Boolean {
-        return email.isNotEmpty() &&
-                password.isNotEmpty() &&
-                android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches() &&
-                password.length >= MIN_PASSWORD_LENGTH
+        return when {
+            email.isEmpty() || !android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches() -> {
+                handleError(AppError.Auth.InvalidEmail())
+                false
+            }
+            password.isEmpty() || password.length < MIN_PASSWORD_LENGTH -> {
+                handleError(AppError.Auth.WeakPassword())
+                false
+            }
+            else -> true
+        }
     }
 
     fun signIn(email: String, password: String) = viewModelScope.launch {
-        if (!isValidForm(email, password)) {
-            updateState {
-                copy(error = "Please enter a valid email and password (min ${MIN_PASSWORD_LENGTH} characters)")
-            }
-            return@launch
-        }
+        if (!isValidForm(email, password)) return@launch
 
         try {
             updateState { copy(isLoading = true, error = null) }
 
             authRepository.signIn(email, password).fold(
-                onSuccess = {
+                onSuccess = { user ->
+                    Log.d(TAG, "Sign in successful for user: ${user.uid}")
                     updateState { copy(isLoggedIn = true) }
-                    Log.d(TAG, "Sign in successful")
                 },
-                onFailure = { e ->
-                    Log.e(TAG, "Sign in failed", e)
-                    updateState {
-                        copy(error = "Account not found or incorrect password")
-                    }
+                onFailure = { error ->
+                    Log.e(TAG, "Sign in failed", error)
+                    handleError(error as? AppError ?: AppError.Unexpected(cause = error))
                 }
             )
-        } catch (e: Exception) {
-            Log.e(TAG, "Unexpected error during sign in", e)
-            updateState { copy(error = "An unexpected error occurred") }
         } finally {
             updateState { copy(isLoading = false) }
         }
     }
 
     fun register(email: String, password: String) = viewModelScope.launch {
-        if (!isValidForm(email, password)) {
-            updateState {
-                copy(error = "Email must be valid and password must be at least $MIN_PASSWORD_LENGTH characters")
-            }
-            return@launch
-        }
+        if (!isValidForm(email, password)) return@launch
 
         try {
             updateState { copy(isLoading = true, error = null) }
 
             authRepository.register(email, password).fold(
-                onSuccess = {
-                    Log.d(TAG, "Registration successful")
+                onSuccess = { user ->
+                    Log.d(TAG, "Registration successful for user: ${user.uid}")
                     updateState {
                         copy(registrationSuccessful = true, error = null)
                     }
                 },
-                onFailure = { e ->
-                    Log.e(TAG, "Registration failed", e)
-                    updateState { copy(error = e.message) }
+                onFailure = { error ->
+                    Log.e(TAG, "Registration failed", error)
+                    handleError(error as? AppError ?: AppError.Unexpected(cause = error))
                 }
             )
-        } catch (e: Exception) {
-            Log.e(TAG, "Unexpected error during registration", e)
-            updateState { copy(error = "An unexpected error occurred") }
         } finally {
             updateState { copy(isLoading = false) }
         }
     }
 
+    /**
+     * Centralized error handling for authentication errors
+     */
+    private fun handleError(error: AppError) {
+        val message = when (error) {
+            is AppError.Auth.InvalidCredentials -> error.message
+            is AppError.Auth.UserNotFound -> error.message
+            is AppError.Auth.WeakPassword -> error.message
+            is AppError.Auth.EmailAlreadyInUse -> error.message
+            is AppError.Auth.InvalidEmail -> error.message
+            is AppError.Auth.SignOutError -> error.message
+            is AppError.Auth.ValidationError -> error.message
+            is AppError.Auth.SessionExpired -> error.message
+            is AppError.Network.NoConnection -> "Please check your internet connection and try again"
+            is AppError.Unexpected -> "An unexpected error occurred. Please try again"
+            else -> "Authentication error occurred"
+        }
+        updateState { copy(error = message) }
+    }
+
     fun updateErrorState(errorMessage: String) {
-        updateState { copy(error = errorMessage) }
+        handleError(AppError.Auth.ValidationError(message = errorMessage))
     }
 
     fun clearError() {

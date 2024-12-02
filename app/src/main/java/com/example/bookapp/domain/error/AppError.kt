@@ -71,9 +71,61 @@ sealed class AppError : Exception() {
             override val cause: Throwable? = null
         ) : Network()
     }
+
+    // Sync Errors
+    sealed class Sync : AppError() {
+        data class NetworkError(
+            override val message: String = "Failed to sync with cloud storage",
+            override val cause: Throwable? = null
+        ) : Sync()
+
+        data class AuthenticationError(
+            override val message: String = "User not authenticated for sync operation",
+            override val cause: Throwable? = null
+        ) : Sync()
+
+        data class ConflictError(
+            override val message: String = "Data conflict during sync",
+            val itemId: String? = null,
+            override val cause: Throwable? = null
+        ) : Sync()
+
+        data class StorageError(
+            override val message: String = "Local storage operation failed",
+            override val cause: Throwable? = null
+        ) : Sync()
+    }
+
+    // Firestore specific errors
+    sealed class Firestore : AppError() {
+        data class DocumentNotFound(
+            override val message: String = "Document not found in Firestore",
+            val documentId: String? = null,
+            override val cause: Throwable? = null
+        ) : Firestore()
+
+        data class PermissionDenied(
+            override val message: String = "Permission denied accessing Firestore",
+            override val cause: Throwable? = null
+        ) : Firestore()
+
+        data class WriteError(
+            override val message: String = "Failed to write to Firestore",
+            val documentId: String? = null,
+            override val cause: Throwable? = null
+        ) : Firestore()
+
+        data class ReadError(
+            override val message: String = "Failed to read from Firestore",
+            val documentId: String? = null,
+            override val cause: Throwable? = null
+        ) : Firestore()
+    }
+
     // Unexpected Errors
     data class Unexpected(
         override val message: String = "An unexpected error occurred",
         override val cause: Throwable? = null
     ) : AppError()
+
 }

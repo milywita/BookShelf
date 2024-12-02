@@ -9,6 +9,7 @@ import android.util.Log
 import com.example.bookapp.data.local.dao.BookDao
 import com.example.bookapp.data.local.entity.toBook
 import com.example.bookapp.data.local.entity.toBookEntity
+import com.example.bookapp.domain.error.AppError
 import com.example.bookapp.domain.model.Book
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.flow.Flow
@@ -18,70 +19,68 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 
 class BookSyncRepository(
-    private val bookDao: BookDao,
-    private val firestoreRepository: FirestoreRepository,
-    private val auth: FirebaseAuth = FirebaseAuth.getInstance()
+  private val bookDao: BookDao,
+  private val firestoreRepository: FirestoreRepository,
+  private val auth: FirebaseAuth = FirebaseAuth.getInstance()
 ) {
-  sealed class SyncError : Exception(){
-    class NetworkError(override val cause: Throwable) : SyncError() {
-      override val message = "Network connection failed: ${cause.message}"
-    }
-    class AuthenticationError : SyncError() {
-      override val message = "User not authenticated. Please log in again."
-    }
-    class SyncConflictError(private val bookId: String) : SyncError() {
-      override val message = "Sync conflict detected for book: $bookId"
-    }
-    class StorageError(override val cause: Throwable) : SyncError() {
-      override val message = "Local storage error: ${cause.message}"
-    }
+  companion object {
+    private const val TAG = "BookSync"
   }
 
   private val currentUserId: String?
     get() = auth.currentUser?.uid
 
-  // Core sync operations
   suspend fun syncWithFirestore() {
-    val userId = currentUserId ?: throw SyncError.AuthenticationError()
+    Log.d(TAG, "Starting sync with Firestore")
+    val userId = currentUserId ?: throw AppError.Sync.AuthenticationError()
 
     try {
       val firestoreBooks = firestoreRepository.getUserBookStream().first()
-      Log.d(TAG, "Syncing ${firestoreBooks.size} books from firestore")
+      Log.d(TAG, "Retrieved ${firestoreBooks.size} books from Firestore")
 
       firestoreBooks.forEach { firebaseBook ->
         try {
           bookDao.insertBook(firebaseBook.toBook().toBookEntity(userId))
+          Log.d(TAG, "Synchronized book: ${firebaseBook.id}")
         } catch (e: Exception) {
-          throw SyncError.SyncConflictError(firebaseBook.id)
+          Log.e(TAG, "Failed to sync book: ${firebaseBook.id}", e)
+          throw AppError.Sync.ConflictError(
+            itemId = firebaseBook.id,
+            cause = e
+          )
         }
       }
-    } catch (e: Exception){
-      when (e) {
-        is SyncError -> throw e
-        else -> throw SyncError.NetworkError(e)
+      Log.i(TAG, "Sync completed successfully")
+    } catch (e: Exception) {
+      Log.e(TAG, "Sync failed", e)
+      throw when (e) {
+        is AppError -> e
+        else -> AppError.Sync.NetworkError(cause = e)
       }
     }
   }
 
-  suspend fun saveBook(book: Book){
-    val userId = currentUserId ?: throw SyncError.AuthenticationError()
-     try{
-        // Save locally first
-       bookDao.insertBook(book.toBookEntity(userId))
-     } catch (e: Exception){
-       throw SyncError.StorageError(e)
-     }
+  suspend fun saveBook(book: Book) {
+    Log.d(TAG, "Attempting to save book: ${book.id}")
+    val userId = currentUserId ?: throw AppError.Sync.AuthenticationError()
 
     try {
-        // Then save to firestore
+      bookDao.insertBook(book.toBookEntity(userId))
+      Log.d(TAG, "Book saved locally: ${book.id}")
+    } catch (e: Exception) {
+      Log.e(TAG, "Failed to save book locally: ${book.id}", e)
+      throw AppError.Sync.StorageError(cause = e)
+    }
+
+    try {
       firestoreRepository.saveBook(book)
-    } catch (e: Exception){
-      Log.w(TAG, "Book saved locally but failed to sync to firestore", e)
-      throw SyncError.NetworkError(e)
+      Log.i(TAG, "Book saved to Firestore: ${book.id}")
+    } catch (e: Exception) {
+      Log.w(TAG, "Book saved locally but failed to sync to Firestore: ${book.id}", e)
+      throw AppError.Sync.NetworkError(cause = e)
     }
   }
 
-  // Book queries
   fun getSavedBooks(): Flow<List<Book>> = currentUserId?.let { userId ->
     bookDao.getUserBooks(userId)
       .map { entities -> entities.map { it.toBook() } }
@@ -90,8 +89,4 @@ class BookSyncRepository(
         emit(emptyList())
       }
   } ?: flowOf(emptyList())
-
-  companion object {
-    private const val TAG = "BookSync"
-  }
 }

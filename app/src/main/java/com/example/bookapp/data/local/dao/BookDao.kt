@@ -1,7 +1,7 @@
 // BookDao.kt
 /**
- * Data Access Object for book-related database operations. Provides methods for querying and
- * modifying locally saved books.
+ * Data Access Object for book-related database operations.
+ * Note: Error handling is provided by BookDaoWrapper.
  */
 package com.example.bookapp.data.local.dao
 

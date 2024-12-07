@@ -120,6 +120,26 @@ sealed class AppError : Exception() {
             val documentId: String? = null,
             override val cause: Throwable? = null
         ) : Firestore()
+
+    }
+
+    //Database
+
+    sealed class Database : AppError() {
+        data class ReadError(
+            override val message: String = "Failed to read from database",
+            override val cause: Throwable? = null
+        ) : Database()
+
+        data class WriteError(
+            override val message: String = "Failed to write to database",
+            override val cause: Throwable? = null
+        ) : Database()
+
+        data class DeleteError(
+            override val message: String = "Failed to delete from database",
+            override val cause: Throwable? = null
+        ) : Database()
     }
 
     // Unexpected Errors

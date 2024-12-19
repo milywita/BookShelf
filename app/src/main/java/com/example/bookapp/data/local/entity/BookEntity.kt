@@ -1,18 +1,21 @@
 // BookEntity.kt
 /**
  * Room entity representing a saved book in the local database. Includes mapping functions to
- * convert between domain and database models.
+ * convert between domain and database models with validation and error handling.
  */
 package com.example.bookapp.data.local.entity
 
+import android.util.Log
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.example.bookapp.domain.error.AppError
 import com.example.bookapp.domain.model.Book
 
 @Entity(
     tableName = "books",
-    indices = [Index(value = ["userId"]), Index(value = ["id", "userId"], unique = true)])
+    indices = [Index(value = ["userId"]), Index(value = ["id", "userId"], unique = true)]
+)
 data class BookEntity(
     @PrimaryKey val id: String,
     val userId: String,
@@ -24,27 +27,62 @@ data class BookEntity(
     val pageCount: Int,
     val categories: String,
     val savedTimestamp: Long = System.currentTimeMillis()
-)
+) {
+    companion object {
+        const val TAG = "BookEntity" // Removed private modifier
+    }
+}
 
-fun Book.toBookEntity(userId: String) = BookEntity(
-    id = id,
-    userId = userId,
-    title = title,
-    author = author,
-    description = description,
-    thumbnailUrl = thumbnailUrl,
-    publishedDate = publishedDate,
-    pageCount = pageCount,
-    categories = categories.joinToString(",")
-)
+fun Book.toBookEntity(userId: String): BookEntity {
+    try {
+        require(id.isNotBlank()) { "Book ID cannot be blank" }
+        require(userId.isNotBlank()) { "User ID cannot be blank" }
+        require(title.isNotBlank()) { "Book title cannot be blank" }
+        require(author.isNotBlank()) { "Book author cannot be blank" }
 
-fun BookEntity.toBook() = Book(
-    id = id,
-    title = title,
-    author = author,
-    description = description,
-    thumbnailUrl = thumbnailUrl,
-    publishedDate = publishedDate,
-    pageCount = pageCount,
-    categories = categories.split(",").filter { it.isNotEmpty() }
-)
+        Log.d(BookEntity.TAG, "Converting Book to BookEntity: $id for user: $userId")
+        return BookEntity(
+            id = id,
+            userId = userId,
+            title = title,
+            author = author,
+            description = description,
+            thumbnailUrl = thumbnailUrl,
+            publishedDate = publishedDate,
+            pageCount = pageCount,
+            categories = categories.joinToString(",")
+        ).also {
+            Log.d(BookEntity.TAG, "Successfully converted Book to BookEntity: $id")
+        }
+    } catch (e: Exception) {
+        Log.e(BookEntity.TAG, "Failed to convert Book to BookEntity: $id", e)
+        throw AppError.Database.WriteError(
+            message = "Failed to create database entity: ${e.message}",
+            cause = e
+        )
+    }
+}
+
+fun BookEntity.toBook(): Book {
+    try {
+        Log.d(BookEntity.TAG, "Converting BookEntity to Book: $id")
+        return Book(
+            id = id,
+            title = title,
+            author = author,
+            description = description,
+            thumbnailUrl = thumbnailUrl,
+            publishedDate = publishedDate,
+            pageCount = pageCount,
+            categories = categories.split(",").filter { it.isNotEmpty() }
+        ).also {
+            Log.d(BookEntity.TAG, "Successfully converted BookEntity to Book: $id")
+        }
+    } catch (e: Exception) {
+        Log.e(BookEntity.TAG, "Failed to convert BookEntity to Book: $id", e)
+        throw AppError.Database.ReadError(
+            message = "Failed to read database entity: ${e.message}",
+            cause = e
+        )
+    }
+}

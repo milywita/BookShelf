@@ -57,6 +57,8 @@ sealed class AppError : Exception() {
             val bookId: String? = null,
             override val cause: Throwable? = null
         ) : Book()
+
+
     }
     // Network Errors
     sealed class Network : AppError() {
@@ -70,6 +72,13 @@ sealed class AppError : Exception() {
             override val message: String = "Server error occurred",
             override val cause: Throwable? = null
         ) : Network()
+
+        data class ServiceInitializationError(
+            override val message: String = "Failed to initialize service",
+            val serviceName: String? = null,
+            override val cause: Throwable? = null
+        ) : Network()
+
     }
 
     // Sync Errors
@@ -133,11 +142,6 @@ sealed class AppError : Exception() {
 
         data class WriteError(
             override val message: String = "Failed to write to database",
-            override val cause: Throwable? = null
-        ) : Database()
-
-        data class DeleteError(
-            override val message: String = "Failed to delete from database",
             override val cause: Throwable? = null
         ) : Database()
     }

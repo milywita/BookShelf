@@ -1,3 +1,4 @@
+//AppError.kt
 package com.example.bookapp.domain.error
 
 sealed class AppError : Exception() {

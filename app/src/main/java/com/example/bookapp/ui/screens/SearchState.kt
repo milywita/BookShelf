@@ -12,5 +12,6 @@ data class SearchState(
     val books: List<Book> = emptyList(),
     val selectedBook: Book? = null,
     val message: String? = null,
-    val isShowingSavedBooks: Boolean = false
+    val isShowingSavedBooks: Boolean = false,
+    val isLoading: Boolean = false
 )

@@ -1,3 +1,4 @@
+// BookSearchViewModel.kt
 package com.example.bookapp.ui.screens
 
 import android.app.Application
@@ -279,13 +280,15 @@ class BookSearchViewModel(application: Application) : AndroidViewModel(applicati
       return@launch
     }
 
+    updateState { copy(isLoading = true) }
     Log.d(TAG, "Attempting to search books with query: $query")
+
     try {
       val result = bookRepository.searchBooks(query)
       result.fold(
         onSuccess = { books ->
           Log.i(TAG, "Successfully found ${books.size} books for query: $query")
-          updateState { copy(books = books) }
+          updateState { copy(books = books, isLoading = false) }
         },
         onFailure = { error ->
           val appError = error as? AppError ?: AppError.Unexpected(cause = error)
@@ -297,22 +300,36 @@ class BookSearchViewModel(application: Application) : AndroidViewModel(applicati
             is AppError.Book.SearchFailed -> "Search failed: ${error.message}"
             else -> error.message ?: "An unexpected error occurred"
           }
-          updateState { copy(message = message) }
+          updateState { copy(message = message, isLoading = false) }
         }
       )
     } catch (e: Exception) {
       val error = AppError.Unexpected(cause = e)
       Log.e(TAG, "Unexpected error during search for query: $query", e)
-      updateState { copy(message = error.message) }
+      updateState { copy(message = error.message, isLoading = false) }
     }
   }
 
   fun saveBook(book: Book) = viewModelScope.launch {
     Log.d(TAG, "Attempting to save book: ${book.id} (${book.title})")
     try {
+      val existingBook = savedBooks.value.find { it.id == book.id }
+      val isGroupUpdate = existingBook != null && existingBook.group != book.group
+
+      // Update UI state immediately for the selected book
+      if (state.value.selectedBook?.id == book.id) {
+        updateState { copy(selectedBook = book) }
+      }
+
       bookSyncRepository.saveBook(book)
       Log.i(TAG, "Successfully saved book: ${book.id}")
-      updateState { copy(message = "Book saved successfully!") }
+
+      val message = if (isGroupUpdate) {
+        "Reading status updated to: ${book.group.displayName}"
+      } else {
+        "Book saved successfully!"
+      }
+      updateState { copy(message = message) }
     } catch (e: Exception) {
       val error = when (e) {
         is AppError -> e
@@ -320,14 +337,24 @@ class BookSearchViewModel(application: Application) : AndroidViewModel(applicati
       }
       Log.e(TAG, "Failed to save book: ${book.id}", error)
       updateState { copy(message = "Error saving book: ${error.message}") }
+
+      // Revert UI state if save failed
+      if (state.value.selectedBook?.id == book.id) {
+        savedBooks.value.find { it.id == book.id }?.let { originalBook ->
+          updateState { copy(selectedBook = originalBook) }
+        }
+      }
     }
   }
 
   fun deleteBook(bookId: String) = viewModelScope.launch {
     Log.d(TAG, "Attempting to delete book: $bookId")
     try {
-      bookRepository.deleteBook(bookId)
-      firestoreRepository.deleteBook(bookId)
+      // Update UI state immediately
+      updateState { copy(selectedBook = null) }
+
+      // Delete from both local database and Firestore
+      bookSyncRepository.deleteBook(bookId)
       Log.i(TAG, "Successfully deleted book: $bookId")
       updateState { copy(message = "Book deleted successfully") }
     } catch (e: Exception) {

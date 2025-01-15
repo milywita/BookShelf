@@ -1,7 +1,18 @@
+// BookSearchScreen.kt
 package com.example.bookapp.ui.screens
 
 import android.app.Application
 import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.keyframes
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -13,12 +24,30 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.bookapp.domain.model.Book
 import com.example.bookapp.BuildConfig
+import com.example.bookapp.domain.model.BookGroup
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import coil.compose.AsyncImage
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.graphics.Color
+
 
 @Composable
 fun BookSearchScreen(
@@ -206,38 +235,165 @@ private fun BookListContent(
     savedBooks: List<Book>,
     viewModel: BookSearchViewModel
 ) {
-    Column {
-        Button(
-            onClick = viewModel::toggleSavedBooks,
-            modifier = Modifier.fillMaxWidth()
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(if (state.isShowingSavedBooks) "Show Search" else "Show Saved Books")
-        }
-
-        if (state.isShowingSavedBooks) {
-            SavedBooksList(savedBooks, viewModel::onBookClick)
-        } else {
-            SearchSection(state, viewModel)
+            Column {
+                Text(
+                    text = if (state.isShowingSavedBooks) "My Library" else "Search Books",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+                if (state.isShowingSavedBooks) {
+                    Text(
+                        text = "${savedBooks.size} books saved",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+                    )
+                }
+            }
+            Button(
+                onClick = viewModel::toggleSavedBooks,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary
+                )
+            ) {
+                Text(if (state.isShowingSavedBooks) "Search Books" else "View Library")
+            }
         }
     }
-}
 
+    if (state.isShowingSavedBooks) {
+        SavedBooksList(savedBooks, viewModel::onBookClick)
+    } else {
+        SearchSection(state, viewModel)
+    }
+}
 @Composable
 private fun SavedBooksList(
     books: List<Book>,
     onBookClick: (Book) -> Unit
 ) {
+    if (books.isEmpty()) {
+        EmptyLibraryMessage()
+        return
+    }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 16.dp)
+            .padding(top = 8.dp)
     ) {
-        items(
-            items = books,
-            key = { book -> book.id }
-        ) { book ->
-            BookItem(book = book, onClick = { onBookClick(book) })
+        // Header section
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "My Library",
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Text(
+                        text = "${books.size} books saved",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                    )
+                }
+            }
         }
+
+        // Books by group
+        val groupedBooks = books.groupBy { it.group }
+            .filter { it.key != BookGroup.NONE }
+            .toSortedMap(compareBy { it.ordinal })
+
+        // Display grouped books
+        groupedBooks.forEach { (group, booksInGroup) ->
+            item {
+                Text(
+                    text = group.displayName,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+            }
+
+            items(booksInGroup) { book ->
+                BookItem(book = book, onClick = { onBookClick(book) })
+            }
+
+            item {
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+        }
+
+        // Ungrouped books
+        val ungroupedBooks = books.filter { it.group == BookGroup.NONE }
+        if (ungroupedBooks.isNotEmpty()) {
+            item {
+                Text(
+                    text = "Other Books",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+            }
+
+            items(ungroupedBooks) { book ->
+                BookItem(book = book, onClick = { onBookClick(book) })
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyLibraryMessage() {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = Icons.Default.MenuBook,
+            contentDescription = null,
+            modifier = Modifier.size(48.dp),
+            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = "Your library is empty",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+        )
+        Text(
+            text = "Save books to see them here",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+        )
     }
 }
 
@@ -246,33 +402,76 @@ private fun SearchSection(
     state: SearchState,
     viewModel: BookSearchViewModel
 ) {
-    OutlinedTextField(
-        value = state.searchQuery,
-        onValueChange = viewModel::onSearchQueryChange,
-        label = { Text("Search for books") },
-        placeholder = { Text("Enter book title") },
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 16.dp)
-    )
+    Column {
+        OutlinedTextField(
+            value = state.searchQuery,
+            onValueChange = viewModel::onSearchQueryChange,
+            label = { Text("Search for books") },
+            placeholder = { Text("Enter book title, author, or keyword") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            singleLine = true,
+            trailingIcon = {
+                IconButton(
+                    onClick = viewModel::onSearchClick,
+                    enabled = !state.isLoading && state.searchQuery.isNotEmpty()
+                ) {
+                    Icon(Icons.Default.Search, contentDescription = "Search")
+                }
+            }
+        )
 
-    Button(
-        onClick = viewModel::onSearchClick,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Text("Search")
-    }
+        if (state.isLoading) {
+            LoadingAnimation()
+        } else if (state.books.isEmpty() && state.searchQuery.isEmpty()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Search,
+                    contentDescription = null,
+                    modifier = Modifier.size(48.dp),
+                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "Search for books",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+                Text(
+                    text = "Find books by title, author, or keyword",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp)
+            ) {
+                if (state.books.isNotEmpty()) {
+                    item {
+                        Text(
+                            text = "Search Results (${state.books.size})",
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
+                    }
+                }
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 16.dp)
-    ) {
-        items(
-            items = state.books,
-            key = { book -> book.id }
-        ) { book ->
-            BookItem(book = book, onClick = { viewModel.onBookClick(book) })
+                items(
+                    items = state.books,
+                    key = { book -> book.id }
+                ) { book ->
+                    BookItem(book = book, onClick = { viewModel.onBookClick(book) })
+                }
+            }
         }
     }
 }
@@ -282,21 +481,256 @@ private fun BookItem(
     book: Book,
     onClick: () -> Unit
 ) {
+    var expanded by remember { mutableStateOf(false) }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp)
             .clickable(onClick = onClick)
+            .animateContentSize(
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessLow
+                )
+            ),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = 2.dp,
+            pressedElevation = 4.dp
+        ),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = book.title,
-                style = MaterialTheme.typography.titleMedium
-            )
-            Text(
-                text = "By ${book.author}",
-                style = MaterialTheme.typography.bodyMedium
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Book thumbnail with shimmer loading
+            Box(
+                modifier = Modifier
+                    .width(80.dp)
+                    .height(120.dp)
+                    .clip(RoundedCornerShape(8.dp))
+            ) {
+                var imageLoading by remember { mutableStateOf(true) }
+
+                if (imageLoading) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                brush = Brush.linearGradient(
+                                    colors = listOf(
+                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                                    ),
+                                    start = Offset(0f, 0f),
+                                    end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
+                                )
+                            )
+                    )
+                }
+
+                AsyncImage(
+                    model = book.thumbnailUrl.ifEmpty {
+                        "https://via.placeholder.com/128x192.png?text=No+Cover"
+                    },
+                    contentDescription = "Book cover for ${book.title}",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
+                    onLoading = { imageLoading = true },
+                    onSuccess = { imageLoading = false },
+                    onError = { imageLoading = false }
+                )
+            }
+
+            // Book info
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = book.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = if (expanded) Int.MAX_VALUE else 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                Text(
+                    text = "By ${book.author}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(vertical = 4.dp)
+                )
+
+                if (book.group != BookGroup.NONE) {
+                    BookGroupChip(group = book.group)
+                }
+
+                if (book.categories.isNotEmpty()) {
+                    Text(
+                        text = book.categories.first(),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                if (book.description.isNotEmpty()) {
+                    IconButton(
+                        onClick = { expanded = !expanded },
+                        modifier = Modifier.align(Alignment.End)
+                    ) {
+                        Icon(
+                            imageVector = if (expanded)
+                                Icons.Default.KeyboardArrowUp
+                            else
+                                Icons.Default.KeyboardArrowDown,
+                            contentDescription = if (expanded)
+                                "Show less"
+                            else
+                                "Show more"
+                        )
+                    }
+
+                    AnimatedVisibility(visible = expanded) {
+                        Text(
+                            text = book.description,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BookGroupChip(group: BookGroup) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = when (group) {
+            BookGroup.READING -> MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+            BookGroup.WANT_TO_READ -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f)
+            BookGroup.FINISHED -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.1f)
+            BookGroup.DID_NOT_FINISH -> MaterialTheme.colorScheme.error.copy(alpha = 0.1f)
+            BookGroup.NONE -> MaterialTheme.colorScheme.surfaceVariant
+        },
+        modifier = Modifier.padding(vertical = 4.dp)
+    ) {
+        Text(
+            text = group.displayName,
+            style = MaterialTheme.typography.bodySmall,
+            color = when (group) {
+                BookGroup.READING -> MaterialTheme.colorScheme.primary
+                BookGroup.WANT_TO_READ -> MaterialTheme.colorScheme.secondary
+                BookGroup.FINISHED -> MaterialTheme.colorScheme.tertiary
+                BookGroup.DID_NOT_FINISH -> MaterialTheme.colorScheme.error
+                BookGroup.NONE -> MaterialTheme.colorScheme.onSurfaceVariant
+            },
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+        )
+    }
+}
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun BookAppTopBar(
+    onSignOut: () -> Unit,
+    onDebugClick: () -> Unit,
+    showDebug: Boolean
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.primary,
+        shadowElevation = 3.dp
+    ) {
+        Column {
+            TopAppBar(
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.MenuBook,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(32.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = "Book Explorer",
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                    }
+                },
+                actions = {
+                    if (BuildConfig.DEBUG) {
+                        IconButton(onClick = onDebugClick) {
+                            Icon(
+                                imageVector = Icons.Default.Build,
+                                contentDescription = "Debug Info",
+                                tint = MaterialTheme.colorScheme.onPrimary
+                            )
+                        }
+                    }
+                    IconButton(onClick = onSignOut) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ExitToApp,
+                            contentDescription = "Sign Out",
+                            tint = MaterialTheme.colorScheme.onPrimary
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.Transparent
+                )
             )
         }
+    }
+}
+
+@Composable
+fun LoadingAnimation(
+    modifier: Modifier = Modifier
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "loading")
+    val alpha by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = keyframes {
+                durationMillis = 1000
+                0.7f at 500
+                0.9f at 800
+            },
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "loading"
+    )
+
+    Row(
+        modifier = modifier
+            .padding(16.dp)
+            .fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        CircularProgressIndicator(
+            modifier = Modifier.size(16.dp),
+            color = MaterialTheme.colorScheme.primary,
+            strokeWidth = 2.dp
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = "Searching...",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.primary.copy(alpha = alpha)
+        )
     }
 }

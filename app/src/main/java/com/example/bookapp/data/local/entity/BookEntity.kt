@@ -3,6 +3,7 @@
  * Room entity representing a saved book in the local database. Includes mapping functions to
  * convert between domain and database models with validation and error handling.
  */
+
 package com.example.bookapp.data.local.entity
 
 import android.util.Log
@@ -11,6 +12,7 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.example.bookapp.domain.error.AppError
 import com.example.bookapp.domain.model.Book
+import com.example.bookapp.domain.model.BookGroup
 
 @Entity(
     tableName = "books",
@@ -26,13 +28,13 @@ data class BookEntity(
     val publishedDate: String,
     val pageCount: Int,
     val categories: String,
+    val group: String = BookGroup.NONE.name,
     val savedTimestamp: Long = System.currentTimeMillis()
 ) {
     companion object {
-        const val TAG = "BookEntity" // Removed private modifier
+        const val TAG = "BookEntity"
     }
 }
-
 fun Book.toBookEntity(userId: String): BookEntity {
     try {
         require(id.isNotBlank()) { "Book ID cannot be blank" }
@@ -50,7 +52,8 @@ fun Book.toBookEntity(userId: String): BookEntity {
             thumbnailUrl = thumbnailUrl,
             publishedDate = publishedDate,
             pageCount = pageCount,
-            categories = categories.joinToString(",")
+            categories = categories.joinToString(","),
+            group = group.name
         ).also {
             Log.d(BookEntity.TAG, "Successfully converted Book to BookEntity: $id")
         }
@@ -74,7 +77,8 @@ fun BookEntity.toBook(): Book {
             thumbnailUrl = thumbnailUrl,
             publishedDate = publishedDate,
             pageCount = pageCount,
-            categories = categories.split(",").filter { it.isNotEmpty() }
+            categories = categories.split(",").filter { it.isNotEmpty() },
+            group = BookGroup.fromString(group)
         ).also {
             Log.d(BookEntity.TAG, "Successfully converted BookEntity to Book: $id")
         }

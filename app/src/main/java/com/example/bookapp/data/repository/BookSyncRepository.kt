@@ -89,4 +89,23 @@ class BookSyncRepository(
         emit(emptyList())
       }
   } ?: flowOf(emptyList())
+
+  suspend fun deleteBook(bookId: String) {
+    Log.d(TAG, "Attempting to delete book: $bookId")
+    val userId = currentUserId ?: throw AppError.Sync.AuthenticationError()
+
+    try {
+      bookDao.deleteBook(bookId, userId)
+      Log.d(TAG, "Book deleted from local database: $bookId")
+    } catch (e: Exception) {
+      Log.e(TAG, "Failed to delete book from local database: $bookId", e)
+      throw AppError.Sync.StorageError(cause = e)
+    }
+    try {
+      firestoreRepository.deleteBook(bookId)
+      Log.i(TAG, "Book deleted from Firestore: $bookId")
+    } catch (e: Exception) {
+      Log.w(TAG, "Failed to delete book from Firestore (will sync later): $bookId", e)
+    }
+  }
 }

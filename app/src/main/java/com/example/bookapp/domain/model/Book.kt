@@ -13,5 +13,6 @@ data class Book(
     val thumbnailUrl: String = "",
     val publishedDate: String = "",
     val pageCount: Int = 0,
-    val categories: List<String> = emptyList()
+    val categories: List<String> = emptyList(),
+    val group: BookGroup = BookGroup.NONE
 )

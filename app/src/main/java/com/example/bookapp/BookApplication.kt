@@ -1,8 +1,8 @@
+// BookApplication.kt
 package com.example.bookapp
 
 import android.app.Application
 import android.util.Log
-import com.example.bookapp.data.local.BookDatabase_Impl
 import com.google.firebase.FirebaseApp
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreSettings

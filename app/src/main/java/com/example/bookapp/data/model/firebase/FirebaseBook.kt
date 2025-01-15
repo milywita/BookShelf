@@ -3,6 +3,7 @@ package com.example.bookapp.data.model.firebase
 import android.util.Log
 import com.example.bookapp.domain.error.AppError
 import com.example.bookapp.domain.model.Book
+import com.example.bookapp.domain.model.BookGroup
 
 data class FirebaseBook(
     val id: String = "",
@@ -13,7 +14,7 @@ data class FirebaseBook(
     val publishedDate: String = "",
     val pageCount: Int = 0,
     val categories: List<String> = emptyList(),
-    // Firebase-specific fields
+    val group: String = BookGroup.NONE.name,
     val savedDate: Long = System.currentTimeMillis(),
     val isLiked: Boolean = false,
     val readingProgress: Int = 0,
@@ -37,9 +38,10 @@ data class FirebaseBook(
                     thumbnailUrl = book.thumbnailUrl,
                     publishedDate = book.publishedDate,
                     pageCount = book.pageCount,
-                    categories = book.categories
+                    categories = book.categories,
+                    group = book.group.name
                 ).also {
-                    Log.d(TAG, "Successfully converted Book to FirebaseBook: ${book.id}")
+                    Log.d(TAG, "Successfully converted Book to FirebaseBook: ${book.id}, group: ${book.group.name}")
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to convert Book to FirebaseBook: ${book.id}", e)
@@ -67,9 +69,10 @@ data class FirebaseBook(
                 thumbnailUrl = thumbnailUrl,
                 publishedDate = publishedDate,
                 pageCount = pageCount,
-                categories = categories
+                categories = categories,
+                group = BookGroup.fromString(group)
             ).also {
-                Log.d(TAG, "Successfully converted FirebaseBook to Book: $id")
+                Log.d(TAG, "Successfully converted FirebaseBook to Book: $id, group: $group")
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to convert FirebaseBook to Book: $id", e)

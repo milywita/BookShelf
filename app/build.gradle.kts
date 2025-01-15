@@ -75,6 +75,7 @@ room {
     schemaDirectory("$projectDir/schemas")
 }
 dependencies {
+
     // Existing dependencies
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -150,5 +151,7 @@ dependencies {
     implementation(libs.firebase.firestore)
     implementation(libs.firebase.coroutines.play.services)
 
+    implementation(libs.coil.compose)
+    implementation(libs.androidx.material.icons.extended)
 }
 

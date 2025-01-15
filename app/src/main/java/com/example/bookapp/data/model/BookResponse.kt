@@ -50,7 +50,7 @@ data class BookItem(
             title = volumeInfo?.title ?: "Unknown Title",
             author = volumeInfo?.authors?.firstOrNull() ?: "Unknown Author",
             description = volumeInfo?.description ?: "",
-            thumbnailUrl = volumeInfo?.imageLinks?.thumbnail ?: "",
+            thumbnailUrl = volumeInfo?.imageLinks?.thumbnail?.replace("http://", "https://") ?: "",
             publishedDate = volumeInfo?.publishedDate ?: "",
             pageCount = volumeInfo?.pageCount ?: 0,
             categories = volumeInfo?.categories ?: emptyList()

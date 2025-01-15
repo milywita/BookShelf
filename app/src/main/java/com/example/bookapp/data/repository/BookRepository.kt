@@ -12,25 +12,27 @@ import com.example.bookapp.data.api.safeApiCall
 import com.example.bookapp.data.local.dao.BookDao
 import com.example.bookapp.domain.model.Book
 import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 class BookRepository(
     private val bookService: BookService,
     private val bookDao: BookDao,
-    private val auth: FirebaseAuth = FirebaseAuth.getInstance()
+    private val auth: FirebaseAuth = FirebaseAuth.getInstance(),
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) {
     companion object {
         private const val TAG = "BookRepository"
     }
 
-    private val currentUserId: String?
-        get() = auth.currentUser?.uid
-
-    suspend fun searchBooks(query: String): Result<List<Book>> = withContext(Dispatchers.IO) {
+    suspend fun searchBooks(
+        query: String,
+        maxResults: Int = BookService.DEFAULT_MAX_RESULTS
+    ): Result<List<Book>> = withContext(ioDispatcher) {
         try {
-            Log.d(TAG, "Searching books with query: $query")
-            val response = safeApiCall { bookService.searchBooks(query) }
+            Log.d(TAG, "Searching books with query: $query, maxResults: $maxResults")
+            val response = safeApiCall { bookService.searchBooks(query, maxResults) }
             val books = response.toBooks()
             Log.d(TAG, "Found ${books.size} books for query: $query")
             Result.success(books)
@@ -41,21 +43,6 @@ class BookRepository(
             }
             Log.e(TAG, "Search failed for query: $query", error)
             Result.failure(error)
-        }
-    }
-
-    suspend fun deleteBook(bookId: String) = withContext(Dispatchers.IO) {
-        try {
-            Log.d(TAG, "Attempting to delete book: $bookId")
-            val userId = currentUserId ?: throw AppError.Auth.UserNotFound()
-            bookDao.deleteBook(bookId, userId)
-            Log.d(TAG, "Successfully deleted book: $bookId")
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to delete book: $bookId", e)
-            throw when (e) {
-                is AppError.Auth.UserNotFound -> e
-                else -> AppError.Book.DeleteFailed(bookId = bookId, cause = e)
-            }
         }
     }
 }

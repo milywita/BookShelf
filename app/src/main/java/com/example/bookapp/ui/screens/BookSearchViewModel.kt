@@ -134,18 +134,25 @@ class BookSearchViewModel(application: Application) : AndroidViewModel(applicati
   private fun observeSavedBooks() = ioScope.launch {
     Log.d(TAG, "Starting saved books observation")
     savedBooks
-      .catch { e ->
-        val error = when (e) {
-          is AppError -> e
-          else -> AppError.Database.ReadError(cause = e)
-        }
-        Log.e(TAG, "Failed to observe saved books", error)
-        emitAll(flowOf(emptyList()))
-      }
-      .collect { books ->
+      .onEach { books ->
         Log.d(TAG, "Updated saved books collection, size: ${books.size}")
         updateSavedBooks(books)
       }
+      .onEmpty {
+        Log.d(TAG, "No saved books found")
+        updateSavedBooks(emptyList())
+      }
+      .onCompletion { error ->
+        error?.let { e ->
+          val appError = when (e) {
+            is AppError -> e
+            else -> AppError.Database.ReadError(cause = e)
+          }
+          Log.e(TAG, "Failed to observe saved books", appError)
+          emit(emptyList())
+        }
+      }
+      .collect()
   }
 
   private fun updateFirestoreBooks(books: List<FirebaseBook>) {

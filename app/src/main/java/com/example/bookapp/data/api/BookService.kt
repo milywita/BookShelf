@@ -1,8 +1,4 @@
 // BookService.kt
-/**
- * REST API interface for the Google Books API.
- * Handles remote data fetching for book searches with error handling.
- */
 package com.example.bookapp.data.api
 
 import android.util.Log
@@ -14,22 +10,20 @@ import retrofit2.http.Query
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 
-interface BookService {
-    companion object {
-        const val TAG = "BookService" // Changed from private to public
-    }
-
+fun interface BookService {
     @GET("volumes")
     @Throws(AppError.Network.NoConnection::class, AppError.Network.ServerError::class)
     suspend fun searchBooks(
         @Query("q") query: String,
-        @Query("maxResults") maxResults: Int = 40
+        @Query("maxResults") maxResults: Int
     ): BookResponse
+
+    companion object {
+        const val TAG = "BookService"
+        const val DEFAULT_MAX_RESULTS = 40
+    }
 }
 
-/**
- * Extension function to handle network errors consistently
- */
 suspend fun <T> safeApiCall(tag: String = BookService.TAG, call: suspend () -> T): T {
     return try {
         call()

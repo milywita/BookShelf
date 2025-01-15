@@ -37,16 +37,15 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import coil.compose.AsyncImage
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.graphics.Color
 
 
 @Composable
@@ -378,7 +377,7 @@ private fun EmptyLibraryMessage() {
         verticalArrangement = Arrangement.Center
     ) {
         Icon(
-            imageVector = Icons.Default.MenuBook,
+            imageVector = Icons.AutoMirrored.Filled.MenuBook,
             contentDescription = null,
             modifier = Modifier.size(48.dp),
             tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
@@ -475,7 +474,6 @@ private fun SearchSection(
         }
     }
 }
-
 @Composable
 private fun BookItem(
     book: Book,
@@ -502,113 +500,163 @@ private fun BookItem(
             containerColor = MaterialTheme.colorScheme.surface
         )
     ) {
+        BookItemContent(book = book, expanded = expanded, onExpandToggle = { expanded = it })
+    }
+}
+
+@Composable
+private fun BookItemContent(
+    book: Book,
+    expanded: Boolean,
+    onExpandToggle: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        BookCover(book.thumbnailUrl, book.title)
+        BookInfo(
+            book = book,
+            expanded = expanded,
+            onExpandToggle = onExpandToggle,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+@Composable
+private fun BookCover(thumbnailUrl: String, title: String) {
+    Box(
+        modifier = Modifier
+            .width(80.dp)
+            .height(120.dp)
+            .clip(RoundedCornerShape(8.dp))
+    ) {
+        var imageLoading by remember { mutableStateOf(true) }
+
+        if (imageLoading) {
+            CoverShimmer()
+        }
+
+        AsyncImage(
+            model = thumbnailUrl.ifEmpty {
+                "https://via.placeholder.com/128x192.png?text=No+Cover"
+            },
+            contentDescription = "Book cover for $title",
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop,
+            onLoading = { imageLoading = true },
+            onSuccess = { imageLoading = false },
+            onError = { imageLoading = false }
+        )
+    }
+}
+
+@Composable
+private fun CoverShimmer() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                brush = Brush.linearGradient(
+                    colors = listOf(
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                    ),
+                    start = Offset(0f, 0f),
+                    end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
+                )
+            )
+    )
+}
+
+@Composable
+private fun BookInfo(
+    book: Book,
+    expanded: Boolean,
+    onExpandToggle: (Boolean) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier) {
+        BookBasicInfo(book, expanded)
+
+        if (book.group != BookGroup.NONE) {
+            BookGroupChip(group = book.group)
+        }
+
+        BookCategory(book.categories)
+        BookDescription(
+            description = book.description,
+            expanded = expanded,
+            onExpandToggle = onExpandToggle
+        )
+    }
+}
+
+@Composable
+private fun BookBasicInfo(book: Book, expanded: Boolean) {
+    Text(
+        text = book.title,
+        style = MaterialTheme.typography.titleMedium,
+        maxLines = if (expanded) Int.MAX_VALUE else 2,
+        overflow = TextOverflow.Ellipsis
+    )
+
+    Text(
+        text = "By ${book.author}",
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier.padding(vertical = 4.dp)
+    )
+}
+
+@Composable
+private fun BookCategory(categories: List<String>) {
+    if (categories.isNotEmpty()) {
+        Text(
+            text = categories.first(),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+private fun BookDescription(
+    description: String,
+    expanded: Boolean,
+    onExpandToggle: (Boolean) -> Unit
+) {
+    if (description.isNotEmpty()) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End
         ) {
-            // Book thumbnail with shimmer loading
-            Box(
-                modifier = Modifier
-                    .width(80.dp)
-                    .height(120.dp)
-                    .clip(RoundedCornerShape(8.dp))
+            IconButton(
+                onClick = { onExpandToggle(!expanded) }
             ) {
-                var imageLoading by remember { mutableStateOf(true) }
-
-                if (imageLoading) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                brush = Brush.linearGradient(
-                                    colors = listOf(
-                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-                                    ),
-                                    start = Offset(0f, 0f),
-                                    end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
-                                )
-                            )
-                    )
-                }
-
-                AsyncImage(
-                    model = book.thumbnailUrl.ifEmpty {
-                        "https://via.placeholder.com/128x192.png?text=No+Cover"
-                    },
-                    contentDescription = "Book cover for ${book.title}",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop,
-                    onLoading = { imageLoading = true },
-                    onSuccess = { imageLoading = false },
-                    onError = { imageLoading = false }
+                Icon(
+                    imageVector = if (expanded) Icons.Default.KeyboardArrowUp
+                    else Icons.Default.KeyboardArrowDown,
+                    contentDescription = if (expanded) "Show less" else "Show more"
                 )
             }
+        }
 
-            // Book info
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-                Text(
-                    text = book.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = if (expanded) Int.MAX_VALUE else 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-
-                Text(
-                    text = "By ${book.author}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(vertical = 4.dp)
-                )
-
-                if (book.group != BookGroup.NONE) {
-                    BookGroupChip(group = book.group)
-                }
-
-                if (book.categories.isNotEmpty()) {
-                    Text(
-                        text = book.categories.first(),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-
-                if (book.description.isNotEmpty()) {
-                    IconButton(
-                        onClick = { expanded = !expanded },
-                        modifier = Modifier.align(Alignment.End)
-                    ) {
-                        Icon(
-                            imageVector = if (expanded)
-                                Icons.Default.KeyboardArrowUp
-                            else
-                                Icons.Default.KeyboardArrowDown,
-                            contentDescription = if (expanded)
-                                "Show less"
-                            else
-                                "Show more"
-                        )
-                    }
-
-                    AnimatedVisibility(visible = expanded) {
-                        Text(
-                            text = book.description,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                            modifier = Modifier.padding(top = 8.dp)
-                        )
-                    }
-                }
-            }
+        AnimatedVisibility(visible = expanded) {
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                modifier = Modifier.padding(top = 8.dp)
+            )
         }
     }
 }
@@ -638,60 +686,6 @@ private fun BookGroupChip(group: BookGroup) {
             },
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
         )
-    }
-}
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun BookAppTopBar(
-    onSignOut: () -> Unit,
-    onDebugClick: () -> Unit,
-    showDebug: Boolean
-) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.primary,
-        shadowElevation = 3.dp
-    ) {
-        Column {
-            TopAppBar(
-                title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.MenuBook,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.size(32.dp)
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(
-                            text = "Book Explorer",
-                            color = MaterialTheme.colorScheme.onPrimary
-                        )
-                    }
-                },
-                actions = {
-                    if (BuildConfig.DEBUG) {
-                        IconButton(onClick = onDebugClick) {
-                            Icon(
-                                imageVector = Icons.Default.Build,
-                                contentDescription = "Debug Info",
-                                tint = MaterialTheme.colorScheme.onPrimary
-                            )
-                        }
-                    }
-                    IconButton(onClick = onSignOut) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ExitToApp,
-                            contentDescription = "Sign Out",
-                            tint = MaterialTheme.colorScheme.onPrimary
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent
-                )
-            )
-        }
     }
 }
 

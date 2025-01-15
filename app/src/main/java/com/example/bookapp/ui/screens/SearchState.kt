@@ -1,7 +1,7 @@
 // SearchState.kt
 /**
- * Data class representing the UI state for book search functionality.
- * Handles search query, results, selected book, messages, and view toggles.
+ * Data class representing the UI state for book search functionality. Handles search query,
+ * results, selected book, messages, and view toggles.
  */
 package com.example.bookapp.ui.screens
 

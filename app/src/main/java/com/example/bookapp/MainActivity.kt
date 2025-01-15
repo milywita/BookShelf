@@ -25,9 +25,11 @@ import com.example.bookapp.ui.theme.BookAppTheme
 
 class MainActivity : ComponentActivity() {
   private val authViewModel: AuthViewModel by viewModels { AuthViewModelFactory(AuthRepository()) }
+  private val authRepository = AuthRepository()
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
+    authRepository.testLogging()
     setContent {
       BookAppTheme {
         val navController = rememberNavController()
@@ -47,9 +49,7 @@ class MainActivity : ComponentActivity() {
                 RegisterScreen(
                     viewModel = authViewModel,
                     onRegisterSuccess = {
-                      navController.navigate("login") {
-                        popUpTo("login") { inclusive = true }
-                      }
+                      navController.navigate("login") { popUpTo("login") { inclusive = true } }
                     },
                     onNavigateToLogin = { navController.popBackStack() })
               }
@@ -63,9 +63,7 @@ class MainActivity : ComponentActivity() {
                 BookSearchScreen(
                     onSignOut = {
                       authViewModel.signOut()
-                      navController.navigate("login") {
-                        popUpTo(0) { inclusive = true }
-                      }
+                      navController.navigate("login") { popUpTo(0) { inclusive = true } }
                     })
               }
             }

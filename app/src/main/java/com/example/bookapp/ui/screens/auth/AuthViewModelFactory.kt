@@ -1,7 +1,7 @@
 // AuthViewModelFactory.kt
 /**
- * Factory for creating AuthViewModel instances with dependency injection.
- * Ensures ViewModels are created with proper repository dependencies.
+ * Factory for creating AuthViewModel instances with dependency injection. Ensures ViewModels are
+ * created with proper repository dependencies.
  */
 package com.example.bookapp.ui.screens.auth
 

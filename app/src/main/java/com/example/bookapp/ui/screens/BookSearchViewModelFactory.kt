@@ -1,7 +1,6 @@
 // BookSearchViewModelFactory.kt
 /**
- * Factory for creating BookSearchViewModel instances.
- * Provides application context to ViewModels.
+ * Factory for creating BookSearchViewModel instances. Provides application context to ViewModels.
  */
 package com.example.bookapp.ui.screens
 

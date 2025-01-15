@@ -1,42 +1,37 @@
 // BookResponse.kt
 /**
- * Data classes for parsing Google Books API responses.
- * Uses Moshi annotations for JSON deserialization with validation.
+ * Data classes for parsing Google Books API responses. Uses Moshi annotations for JSON
+ * deserialization with validation.
  */
 package com.example.bookapp.data.model
 
-import android.util.Log
 import com.example.bookapp.domain.error.AppError
 import com.example.bookapp.domain.model.Book
+import com.example.bookapp.util.Logger
 import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 
 @JsonClass(generateAdapter = true)
-data class BookResponse(
-    @Json(name = "items") val items: List<BookItem>? = null
-) {
-    companion object {
-        private const val TAG = "BookResponse"
-    }
+data class BookResponse(@Json(name = "items") val items: List<BookItem>? = null) {
+  companion object {
+    private const val TAG = "BookResponse"
+  }
 
-    fun toBooks(): List<Book> {
-        return try {
-            items?.mapNotNull { bookItem ->
-                try {
-                    bookItem.toBook()
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to parse book item", e)
-                    null
-                }
-            } ?: emptyList()
+  fun toBooks(): List<Book> {
+    return try {
+      items?.mapNotNull { bookItem ->
+        try {
+          bookItem.toBook()
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to parse book response", e)
-            throw AppError.Network.ServerError(
-                message = "Failed to parse API response",
-                cause = e
-            )
+          Logger.e(TAG, "Failed to parse book item", e) // Replaced Log.e
+          null
         }
+      } ?: emptyList()
+    } catch (e: Exception) {
+      Logger.e(TAG, "Failed to parse book response", e) // Replaced Log.e
+      throw AppError.Network.ServerError(message = "Failed to parse API response", cause = e)
     }
+  }
 }
 
 @JsonClass(generateAdapter = true)
@@ -44,18 +39,17 @@ data class BookItem(
     @Json(name = "id") val id: String? = null,
     @Json(name = "volumeInfo") val volumeInfo: VolumeInfo? = null
 ) {
-    fun toBook(): Book {
-        return Book(
-            id = requireNotNull(id) { "Book ID cannot be null" },
-            title = volumeInfo?.title ?: "Unknown Title",
-            author = volumeInfo?.authors?.firstOrNull() ?: "Unknown Author",
-            description = volumeInfo?.description ?: "",
-            thumbnailUrl = volumeInfo?.imageLinks?.thumbnail?.replace("http://", "https://") ?: "",
-            publishedDate = volumeInfo?.publishedDate ?: "",
-            pageCount = volumeInfo?.pageCount ?: 0,
-            categories = volumeInfo?.categories ?: emptyList()
-        )
-    }
+  fun toBook(): Book {
+    return Book(
+        id = requireNotNull(id) { "Book ID cannot be null" },
+        title = volumeInfo?.title ?: "Unknown Title",
+        author = volumeInfo?.authors?.firstOrNull() ?: "Unknown Author",
+        description = volumeInfo?.description ?: "",
+        thumbnailUrl = volumeInfo?.imageLinks?.thumbnail?.replace("http://", "https://") ?: "",
+        publishedDate = volumeInfo?.publishedDate ?: "",
+        pageCount = volumeInfo?.pageCount ?: 0,
+        categories = volumeInfo?.categories ?: emptyList())
+  }
 }
 
 @JsonClass(generateAdapter = true)
@@ -70,6 +64,4 @@ data class VolumeInfo(
 )
 
 @JsonClass(generateAdapter = true)
-data class ImageLinks(
-    @Json(name = "thumbnail") val thumbnail: String? = null
-)
+data class ImageLinks(@Json(name = "thumbnail") val thumbnail: String? = null)

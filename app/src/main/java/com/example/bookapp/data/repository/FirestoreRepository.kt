@@ -26,10 +26,11 @@ class FirestoreRepository {
   private val currentUserId: String?
     get() = auth.currentUser?.uid
 
-  private fun getUserBookCollection() = firestore
-    .collection("users")
-    .document(currentUserId ?: throw AppError.Auth.UserNotFound())
-    .collection("books")
+  private fun getUserBookCollection() =
+      firestore
+          .collection("users")
+          .document(currentUserId ?: throw AppError.Auth.UserNotFound())
+          .collection("books")
 
   suspend fun saveBook(book: Book) {
     Log.d(TAG, "Attempting to save book: ${book.id}")
@@ -40,11 +41,12 @@ class FirestoreRepository {
     } catch (e: Exception) {
       Log.e(TAG, "Failed to save book: ${book.id}", e)
       throw when (e) {
-        is FirebaseFirestoreException -> when (e.code) {
-          FirebaseFirestoreException.Code.PERMISSION_DENIED ->
-            AppError.Firestore.PermissionDenied(cause = e)
-          else -> AppError.Firestore.WriteError(documentId = book.id, cause = e)
-        }
+        is FirebaseFirestoreException ->
+            when (e.code) {
+              FirebaseFirestoreException.Code.PERMISSION_DENIED ->
+                  AppError.Firestore.PermissionDenied(cause = e)
+              else -> AppError.Firestore.WriteError(documentId = book.id, cause = e)
+            }
         else -> AppError.Unexpected(cause = e)
       }
     }
@@ -54,21 +56,22 @@ class FirestoreRepository {
     Log.d(TAG, "Attempting to fetch book: $bookId")
     try {
       return getUserBookCollection()
-        .document(bookId)
-        .get()
-        .await()
-        .toObject(FirebaseBook::class.java)
-        ?.also { Log.i(TAG, "Successfully retrieved book: $bookId") }
+          .document(bookId)
+          .get()
+          .await()
+          .toObject(FirebaseBook::class.java)
+          ?.also { Log.i(TAG, "Successfully retrieved book: $bookId") }
     } catch (e: Exception) {
       Log.e(TAG, "Failed to get book: $bookId", e)
       throw when (e) {
-        is FirebaseFirestoreException -> when (e.code) {
-          FirebaseFirestoreException.Code.NOT_FOUND ->
-            AppError.Firestore.DocumentNotFound(documentId = bookId, cause = e)
-          FirebaseFirestoreException.Code.PERMISSION_DENIED ->
-            AppError.Firestore.PermissionDenied(cause = e)
-          else -> AppError.Firestore.ReadError(documentId = bookId, cause = e)
-        }
+        is FirebaseFirestoreException ->
+            when (e.code) {
+              FirebaseFirestoreException.Code.NOT_FOUND ->
+                  AppError.Firestore.DocumentNotFound(documentId = bookId, cause = e)
+              FirebaseFirestoreException.Code.PERMISSION_DENIED ->
+                  AppError.Firestore.PermissionDenied(cause = e)
+              else -> AppError.Firestore.ReadError(documentId = bookId, cause = e)
+            }
         else -> AppError.Unexpected(cause = e)
       }
     }
@@ -76,20 +79,20 @@ class FirestoreRepository {
 
   fun getUserBookStream(): Flow<List<FirebaseBook>> = callbackFlow {
     Log.d(TAG, "Starting book stream")
-    val subscription = getUserBookCollection().addSnapshotListener { snapshot, error ->
-      when {
-        error != null -> {
-          Log.e(TAG, "Error in book stream", error)
-          trySendBlocking(emptyList())
+    val subscription =
+        getUserBookCollection().addSnapshotListener { snapshot, error ->
+          when {
+            error != null -> {
+              Log.e(TAG, "Error in book stream", error)
+              trySendBlocking(emptyList())
+            }
+            snapshot != null -> {
+              val books = snapshot.documents.mapNotNull { it.toObject(FirebaseBook::class.java) }
+              Log.d(TAG, "Stream received ${books.size} books")
+              trySendBlocking(books)
+            }
+          }
         }
-        snapshot != null -> {
-          val books = snapshot.documents
-            .mapNotNull { it.toObject(FirebaseBook::class.java) }
-          Log.d(TAG, "Stream received ${books.size} books")
-          trySendBlocking(books)
-        }
-      }
-    }
 
     awaitClose {
       Log.d(TAG, "Closing book stream")
@@ -105,13 +108,14 @@ class FirestoreRepository {
     } catch (e: Exception) {
       Log.e(TAG, "Failed to delete book: $bookId", e)
       throw when (e) {
-        is FirebaseFirestoreException -> when (e.code) {
-          FirebaseFirestoreException.Code.NOT_FOUND ->
-            AppError.Firestore.DocumentNotFound(documentId = bookId, cause = e)
-          FirebaseFirestoreException.Code.PERMISSION_DENIED ->
-            AppError.Firestore.PermissionDenied(cause = e)
-          else -> AppError.Firestore.WriteError(documentId = bookId, cause = e)
-        }
+        is FirebaseFirestoreException ->
+            when (e.code) {
+              FirebaseFirestoreException.Code.NOT_FOUND ->
+                  AppError.Firestore.DocumentNotFound(documentId = bookId, cause = e)
+              FirebaseFirestoreException.Code.PERMISSION_DENIED ->
+                  AppError.Firestore.PermissionDenied(cause = e)
+              else -> AppError.Firestore.WriteError(documentId = bookId, cause = e)
+            }
         else -> AppError.Unexpected(cause = e)
       }
     }

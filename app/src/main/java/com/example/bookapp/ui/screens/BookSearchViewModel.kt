@@ -279,6 +279,22 @@ class BookSearchViewModel(application: Application) : AndroidViewModel(applicati
           result.fold(
               onSuccess = { books ->
                 Logger.i(TAG, "Successfully found ${books.size} books for query: $query")
+
+                // Check if any of these books are in our saved books and missing thumbnails
+                val savedBooksMap = savedBooks.value.associateBy { it.id }
+                books.forEach { searchResult ->
+                  savedBooksMap[searchResult.id]?.let { savedBook ->
+                    if (savedBook.thumbnailUrl.isBlank() &&
+                        searchResult.thumbnailUrl.isNotBlank()) {
+                      // Update the saved book with the thumbnail URL
+                      Logger.d(TAG, "Recovering thumbnail for book: ${savedBook.id}")
+                      viewModelScope.launch {
+                        saveBook(savedBook.copy(thumbnailUrl = searchResult.thumbnailUrl))
+                      }
+                    }
+                  }
+                }
+
                 updateState { copy(books = books, isLoading = false) }
               },
               onFailure = { error ->
@@ -301,54 +317,61 @@ class BookSearchViewModel(application: Application) : AndroidViewModel(applicati
         }
       }
 
-  fun saveBook(book: Book) =
-      viewModelScope.launch {
+    fun saveBook(book: Book) = viewModelScope.launch {
         Logger.d(TAG, "Attempting to save book: ${book.id} (${book.title})")
         try {
-          val existingBook = savedBooks.value.find { it.id == book.id }
-          val isGroupUpdate = existingBook != null && existingBook.group != book.group
+            val existingBook = savedBooks.value.find { it.id == book.id }
+            val isGroupUpdate = existingBook != null && existingBook.group != book.group
 
-          // Update UI state immediately for the selected book
-          if (state.value.selectedBook?.id == book.id) {
-            updateState { copy(selectedBook = book) }
-          }
+            // Create updated book preserving existing data
+            val bookToSave = if (existingBook != null) {
+                existingBook.copy(
+                    group = book.group,
+                    // Only update thumbnail if the new one is not blank
+                    thumbnailUrl = if (book.thumbnailUrl.isNotBlank()) book.thumbnailUrl else existingBook.thumbnailUrl
+                )
+            } else {
+                book
+            }
 
-          bookSyncRepository.saveBook(book)
-          Logger.i(TAG, "Successfully saved book: ${book.id}")
+            // Update UI state immediately for the selected book
+            if (state.value.selectedBook?.id == book.id) {
+                updateState { copy(selectedBook = bookToSave) }
+            }
 
-          val message =
-              if (isGroupUpdate) {
+            bookSyncRepository.saveBook(bookToSave)
+            Logger.i(TAG, "Successfully saved book: ${book.id}")
+
+            val message = if (isGroupUpdate) {
                 "Reading status updated to: ${book.group.displayName}"
-              } else {
+            } else {
                 "Book saved successfully!"
-              }
-          updateState { copy(message = message) }
+            }
+            updateState { copy(message = message) }
         } catch (e: Exception) {
-          val error =
-              when (e) {
+            val error = when (e) {
                 is AppError -> e
                 else -> AppError.Unexpected(cause = e)
-              }
-          Logger.e(TAG, "Failed to save book: ${book.id}", error)
-          updateState { copy(message = "Error saving book: ${error.message}") }
+            }
+            Logger.e(TAG, "Failed to save book: ${book.id}", error)
+            updateState { copy(message = "Error saving book: ${error.message}") }
 
-          // Revert UI state if save failed
-          if (state.value.selectedBook?.id == book.id) {
-            savedBooks.value
-                .find { it.id == book.id }
-                ?.let { originalBook -> updateState { copy(selectedBook = originalBook) } }
-          }
+            // Revert UI state if save failed
+            if (state.value.selectedBook?.id == book.id) {
+                savedBooks.value
+                    .find { it.id == book.id }
+                    ?.let { originalBook -> updateState { copy(selectedBook = originalBook) } }
+            }
         }
-      }
+    }
 
   fun deleteBook(bookId: String) =
       viewModelScope.launch {
         Logger.d(TAG, "Attempting to delete book: $bookId")
         try {
-          // Update UI state immediately
+
           updateState { copy(selectedBook = null) }
 
-          // Delete from both local database and Firestore
           bookSyncRepository.deleteBook(bookId)
           Logger.i(TAG, "Successfully deleted book: $bookId")
           updateState { copy(message = "Book deleted successfully") }

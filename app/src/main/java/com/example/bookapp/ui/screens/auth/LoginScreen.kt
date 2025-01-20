@@ -31,6 +31,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 
@@ -52,7 +53,6 @@ fun LoginScreen(
       horizontalAlignment = Alignment.CenterHorizontally,
       verticalArrangement = Arrangement.Center) {
         LoginHeader()
-        TestUserSection(viewModel)
         RegistrationSuccessMessage(state.registrationSuccessful)
         ErrorMessage(state.error)
         LoginForm(
@@ -71,26 +71,6 @@ fun LoginScreen(
 @Composable
 private fun LoginHeader() {
   Text(text = "Welcome Back", style = MaterialTheme.typography.headlineMedium)
-}
-
-// For faster TESTING
-@Composable
-private fun TestUserSection(viewModel: AuthViewModel) {
-  Row(
-      modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-      horizontalArrangement = Arrangement.SpaceEvenly) {
-        TestUserButton(email = "test@test.com", label = "Test User 1", viewModel = viewModel)
-        TestUserButton(email = "test2@test.com", label = "Test User 2", viewModel = viewModel)
-      }
-}
-
-@Composable
-private fun TestUserButton(email: String, label: String, viewModel: AuthViewModel) {
-  Button(
-      onClick = { viewModel.signIn(email, "test123") },
-      colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)) {
-        Text(label)
-      }
 }
 
 @Composable
@@ -129,31 +109,74 @@ private fun LoginForm(
     isLoading: Boolean,
     enabled: Boolean
 ) {
-  Spacer(modifier = Modifier.height(32.dp))
+    var emailError by remember { mutableStateOf<String?>(null) }
+    var isEmailFocused by remember { mutableStateOf(false) }
+    val emailRegex = android.util.Patterns.EMAIL_ADDRESS
 
-  OutlinedTextField(
-      value = credentials.email,
-      onValueChange = onEmailChange,
-      label = { Text("Email") },
-      modifier = Modifier.fillMaxWidth(),
-      singleLine = true)
+    fun validateEmail(email: String): String? {
+        return when {
+            email.isBlank() -> "Email cannot be empty"
+            !emailRegex.matcher(email).matches() -> "Invalid email format"
+            else -> null
+        }
+    }
 
-  Spacer(modifier = Modifier.height(16.dp))
+    Spacer(modifier = Modifier.height(32.dp))
 
-  OutlinedTextField(
-      value = credentials.password,
-      onValueChange = onPasswordChange,
-      label = { Text("Password") },
-      visualTransformation = PasswordVisualTransformation(),
-      modifier = Modifier.fillMaxWidth(),
-      singleLine = true)
+    // Email Field
+    OutlinedTextField(
+        value = credentials.email,
+        onValueChange = {
+            onEmailChange(it)
+            // Clear the error while typing
+            if (isEmailFocused) emailError = null
+        },
+        label = { Text("Email") },
+        isError = emailError != null, // Show red outline if there is an error
+        modifier = Modifier
+            .fillMaxWidth()
+            .onFocusChanged { focusState ->
+                if (!focusState.isFocused && credentials.email.isNotBlank()) {
+                    // Validate only after the user moves focus away from the field
+                    emailError = validateEmail(credentials.email)
+                }
+                isEmailFocused = focusState.isFocused
+            },
+        singleLine = true
+    )
+    if (emailError != null) {
+        Text(
+            text = emailError!!,
+            color = MaterialTheme.colorScheme.error,
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(start = 8.dp)
+        )
+    }
 
-  Spacer(modifier = Modifier.height(32.dp))
+    Spacer(modifier = Modifier.height(16.dp))
 
-  Button(onClick = onSubmit, modifier = Modifier.fillMaxWidth(), enabled = !isLoading && enabled) {
-    Text(if (isLoading) "Signing in..." else "Sign In")
-  }
+    // Password Field
+    OutlinedTextField(
+        value = credentials.password,
+        onValueChange = onPasswordChange,
+        label = { Text("Password") },
+        visualTransformation = PasswordVisualTransformation(),
+        modifier = Modifier.fillMaxWidth(),
+        singleLine = true
+    )
+
+    Spacer(modifier = Modifier.height(32.dp))
+
+    // Submit Button
+    Button(
+        onClick = onSubmit,
+        modifier = Modifier.fillMaxWidth(),
+        enabled = !isLoading && enabled && emailError == null
+    ) {
+        Text(if (isLoading) "Signing in..." else "Sign In")
+    }
 }
+
 
 @Composable
 private fun RegisterButton(onClick: () -> Unit) {

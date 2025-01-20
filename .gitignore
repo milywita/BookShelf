@@ -36,3 +36,6 @@ Thumbs.db
 
 # Log Files
 *.log
+
+#Secret
+secrets.properties

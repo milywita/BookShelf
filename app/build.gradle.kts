@@ -1,4 +1,6 @@
 // App-specific  build configuration
+import org.gradle.api.GradleException
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
@@ -9,12 +11,28 @@ plugins {
     id("com.google.gms.google-services")
 }
 
+val secretsFile = rootProject.file("secrets.properties")
+val secrets = Properties()
+if (secretsFile.exists()) {
+    secrets.load(secretsFile.inputStream())
+} else {
+    throw GradleException("secrets.properties not found. Please create it from secrets.properties.template")
+}
+
 android {
     namespace = "com.example.bookapp"
     compileSdk = 35
 
-    buildFeatures {
-        buildConfig = true
+    signingConfigs {
+        create("release") {
+            storeFile = file("../release-key.jks")
+            storePassword = System.getenv("RELEASE_STORE_PASSWORD")
+                ?: secrets.getProperty("RELEASE_STORE_PASSWORD")
+            keyAlias = System.getenv("RELEASE_KEY_ALIAS")
+                ?: secrets.getProperty("RELEASE_KEY_ALIAS", "release")
+            keyPassword = System.getenv("RELEASE_KEY_PASSWORD")
+                ?: secrets.getProperty("RELEASE_KEY_PASSWORD")
+        }
     }
 
     defaultConfig {
@@ -22,20 +40,52 @@ android {
         minSdk = 24
         targetSdk = 34
         versionCode = 1
-        versionName = "1.0"
+        versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField("String", "BOOKS_API_KEY", "\"${secrets.getProperty("BOOKS_API_KEY")}\"")
+        buildConfigField("String", "FIREBASE_WEB_CLIENT_ID", "\"${secrets.getProperty("FIREBASE_WEB_CLIENT_ID")}\"")
     }
 
     buildTypes {
-        release {
+        debug {
+            isDebuggable = true
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
             isMinifyEnabled = false
+            isShrinkResources = false
+            buildConfigField("Boolean", "DEBUG_MODE", "true")
+        }
+        release {
+            isDebuggable = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            buildConfigField("Boolean", "DEBUG_MODE", "false")
         }
     }
+
+    sourceSets {
+        getByName("debug") {
+            java.srcDirs("src/debug/java")
+            res.srcDirs("src/debug/res")
+            assets.srcDirs("src/debug/assets")
+        }
+        getByName("release") {
+            java.srcDirs("src/release/java")
+            res.srcDirs("src/release/res")
+            assets.srcDirs("src/release/assets")
+        }
+        getByName("main") {
+            java.srcDirs("src/main/java")
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
@@ -44,6 +94,7 @@ android {
         jvmTarget = "11"
     }
     buildFeatures {
+        buildConfig = true
         compose = true
     }
     composeOptions {
@@ -153,5 +204,7 @@ dependencies {
 
     implementation(libs.coil.compose)
     implementation(libs.androidx.material.icons.extended)
+
+    implementation(libs.logging.interceptor)
 }
 

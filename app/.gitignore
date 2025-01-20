@@ -1,4 +1,12 @@
+# Build files
 /build
+/release
+/debug
 
 # Google Services configuration
 google-services.json
+*.aab
+*.apk
+
+# Secrets
+secrets.properties

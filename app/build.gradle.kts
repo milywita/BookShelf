@@ -20,7 +20,7 @@ if (secretsFile.exists()) {
 }
 
 android {
-    namespace = "com.example.bookapp"
+    namespace = "com.milywita.bookapp"
     compileSdk = 35
 
     signingConfigs {
@@ -36,20 +36,21 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.bookapp"
+        applicationId = "com.milywita.bookapp"
         minSdk = 24
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 4
+        versionName = "1.0.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        buildConfigField("String", "BOOKS_API_KEY", "\"${secrets.getProperty("BOOKS_API_KEY")}\"")
         buildConfigField("String", "FIREBASE_WEB_CLIENT_ID", "\"${secrets.getProperty("FIREBASE_WEB_CLIENT_ID")}\"")
     }
 
     buildTypes {
         debug {
+            buildConfigField("String", "BOOKS_API_KEY", "\"${secrets.getProperty("BOOKS_API_KEY_DEBUG")}\"")
+            buildConfigField("String", "FIREBASE_WEB_CLIENT_ID", "\"${secrets.getProperty("FIREBASE_WEB_CLIENT_ID_DEBUG")}\"")
             isDebuggable = true
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
@@ -58,6 +59,8 @@ android {
             buildConfigField("Boolean", "DEBUG_MODE", "true")
         }
         release {
+            buildConfigField("String", "BOOKS_API_KEY", "\"${secrets.getProperty("BOOKS_API_KEY_PROD")}\"")
+            buildConfigField("String", "FIREBASE_WEB_CLIENT_ID", "\"${secrets.getProperty("FIREBASE_WEB_CLIENT_ID_PROD")}\"")
             isDebuggable = false
             isMinifyEnabled = true
             isShrinkResources = true
@@ -105,13 +108,6 @@ android {
         getByName("main") {
             java.srcDirs("src/main/java")
         }
-        testOptions {
-            unitTests {
-                isIncludeAndroidResources = true
-                isReturnDefaultValues = true
-            }
-        }
-
         tasks.withType<Test> {
             jvmArgs("-XX:+EnableDynamicAgentLoading")
         }
@@ -121,6 +117,14 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+            isReturnDefaultValues = true
+        }
+    }
+
 }
 room {
     schemaDirectory("$projectDir/schemas")
@@ -156,7 +160,6 @@ dependencies {
 
     //firebase
     implementation(platform(libs.firebase.bom))
-    implementation(libs.google.firebase.analytics)
     implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore)
 
@@ -170,9 +173,6 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
-
-    // Import the Firebase BoM
-    implementation(platform(libs.firebase.bom))
 
     // Testing
     testImplementation(libs.junit)
@@ -196,10 +196,6 @@ dependencies {
 
     // Firebase
 
-    implementation(platform(libs.firebase.bom))
-    implementation(libs.firebase.analytics)
-    implementation(libs.firebase.auth)
-    implementation(libs.firebase.firestore)
     implementation(libs.firebase.coroutines.play.services)
 
     implementation(libs.coil.compose)

@@ -34,9 +34,9 @@
 -dontwarn org.conscrypt.**
 
 # Your app models
--keep class com.example.bookapp.data.model.** { *; }
--keep class com.example.bookapp.domain.model.** { *; }
--keep class com.example.bookapp.data.model.firebase.** { *; }
+-keep class com.milywita.bookapp.data.model.** { *; }
+-keep class com.milywita.bookapp.domain.model.** { *; }
+-keep class com.milywita.bookapp.data.model.firebase.** { *; }
 
 # Firebase
 -keep class com.google.firebase.** { *; }
@@ -50,3 +50,6 @@
 -keepclassmembers class kotlinx.coroutines.** {
     volatile <fields>;
 }
+
+-keep class androidx.test.core.app.InstrumentationActivityInvoker$* { *; }
+-dontwarn androidx.test.core.app.InstrumentationActivityInvoker$*
